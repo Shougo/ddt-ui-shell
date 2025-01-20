@@ -1,13 +1,3 @@
-function ddt#ui#shell#kill_editor() abort
-  if !'g:ddt_ui_last_winid'->exists()
-    return
-  endif
-
-  bdelete
-
-  call win_gotoid(g:ddt_ui_last_winid)
-endfunction
-
 function ddt#ui#shell#_split(params) abort
   if a:params.split ==# ''
     return

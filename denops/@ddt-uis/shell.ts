@@ -14,6 +14,7 @@ import {
   rawString,
   useEval,
 } from "jsr:@denops/std@~7.4.0/eval";
+import { Pty } from "jsr:@sigma/pty-ffi@~0.26.3";
 
 export type Params = {
   cwd: string;
@@ -234,7 +235,7 @@ export class Ui extends BaseUi<Params> {
       cwd: "",
       floatingBorder: "",
       nvimServer: "",
-      prompt: "",
+      prompt: "%",
       promptPattern: "",
       shellHistoryMax: 500,
       split: "",
@@ -271,6 +272,15 @@ export class Ui extends BaseUi<Params> {
     }
 
     await this.#initOptions(denops, options);
+
+    await fn.setline(denops, 1, `${params.prompt} `);
+    await fn.cursor(
+      denops,
+      await fn.line(denops, "$") + 1,
+      await fn.col(denops, "$") + 1,
+    );
+
+    await fn.setbufvar(denops, this.#bufNr, "&modified", false);
   }
 
   async #winId(denops: Denops): Promise<number> {
@@ -299,8 +309,10 @@ export class Ui extends BaseUi<Params> {
         await fn.setwinvar(denops, winid, "&statuscolumn", "");
       }
 
+      await fn.setbufvar(denops, this.#bufNr, "&buftype", "nofile");
       await fn.setbufvar(denops, this.#bufNr, "&bufhidden", "hide");
       await fn.setbufvar(denops, this.#bufNr, "&swapfile", 0);
+      await fn.setbufvar(denops, this.#bufNr, "&modified", false);
     });
 
     await fn.setbufvar(denops, this.#bufNr, "&filetype", "ddt-shell");
@@ -395,6 +407,20 @@ async function jobSendString(
 ) {
   await useEval(denops, async (_denops: Denops) => {
     // TODO
+    const pty = new Pty({
+      cmd: "bash",
+      args: [],
+      env: [],
+    });
+
+    // executs ls -la repedetly and shows output
+    while (true) {
+      await pty.write("ls -la\n");
+      const { data, done } = await pty.read();
+      if (done) break;
+      console.log(data);
+      await new Promise((r) => setTimeout(r, 100));
+    }
   });
 }
 

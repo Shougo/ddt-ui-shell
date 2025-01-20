@@ -30,6 +30,8 @@ Please install both "ddu.vim" and "denops.vim".
 https://github.com/Shougo/ddu.vim
 https://github.com/vim-denops/denops.vim
 
+It requires "--unstable-ffi" for |g:denops#server#deno_args|.
+
 
 ==============================================================================
 INTERFACE                                             *ddt-ui-shell-interface*
@@ -83,8 +85,16 @@ cwd		string
                                                    *ddt-ui-shell-param-prompt*
 prompt		string
 		Sets the shell prompt.
+		NOTE: It cannot be changed after UI is created.
+
+		Default: "%"
+
+                                            *ddt-ui-shell-param-promptPattern*
+promptPattern	string
+		Sets the pattern which matches the shell prompt.
 		NOTE: The right prompt is not supported.
 
+		Default: "\w*% \?"
                                                     *ddt-ui-shell-param-split*
 split
 		Specify the split direction.
@@ -137,6 +147,12 @@ winWidth	number
 ==============================================================================
 EXAMPLES                                               *ddt-ui-shell-examples*
 >vim
+	let g:denops#server#deno_args = [
+	    \   '-q',
+	    \   '-A',
+	    \ ]
+	let g:denops#server#deno_args += ['--unstable-ffi']
+
 	call ddt#custom#patch_global(#{
 	      \   uiParams: #{
 	      \     shell: #{
@@ -145,7 +161,6 @@ EXAMPLES                                               *ddt-ui-shell-examples*
 	      \   },
 	      \ })
 <
-
 ==============================================================================
 FREQUENTLY ASKED QUESTIONS (FAQ)                            *ddt-ui-shell-faq*
 
