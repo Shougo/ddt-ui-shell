@@ -268,6 +268,8 @@ export class Ui extends BaseUi<Params> {
     const bufferName = `ddt-shell-${options.name}`;
     this.#bufNr = await fn.bufadd(denops, bufferName);
 
+    await denops.cmd(`buffer ${this.#bufNr}`);
+
     if (params.startInsert) {
       await denops.cmd("startinsert");
     }
