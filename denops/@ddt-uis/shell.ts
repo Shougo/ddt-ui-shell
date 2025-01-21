@@ -14,13 +14,14 @@ import {
   rawString,
   useEval,
 } from "jsr:@denops/std@~7.4.0/eval";
-import { Pty } from "jsr:@sigma/pty-ffi@~0.26.3";
+import { Pty } from "jsr:@sigma/pty-ffi@~0.26.4";
 
 export type Params = {
   cwd: string;
   floatingBorder: string;
   nvimServer: string;
   prompt: string;
+  promptHighlight: string;
   promptPattern: string;
   shellHistoryMax: number;
   split: string;
@@ -43,6 +44,7 @@ type SendParams = {
 export class Ui extends BaseUi<Params> {
   #bufNr = -1;
   #cwd = "";
+  #pty: Pty | null = null;
 
   override async redraw(args: {
     denops: Denops;
@@ -67,6 +69,8 @@ export class Ui extends BaseUi<Params> {
 
       await fn.mkdir(args.denops, cwd, "p");
     }
+
+    this.#cwd = cwd;
 
     if (await fn.bufexists(args.denops, this.#bufNr)) {
       await this.#switchBuffer(args.denops, args.uiParams, cwd);
@@ -107,6 +111,7 @@ export class Ui extends BaseUi<Params> {
       callback: async (args: {
         denops: Denops;
         options: DdtOptions;
+        uiParams: Params;
         actionParams: BaseParams;
       }) => {
         if (await fn.bufnr(args.denops, "%") != this.#bufNr) {
@@ -116,6 +121,8 @@ export class Ui extends BaseUi<Params> {
         const params = args.actionParams as CdParams;
 
         await this.#cd(args.denops, params.directory);
+
+        await this.#newPrompt(args.denops, args.uiParams);
       },
     },
     executeLine: {
@@ -136,11 +143,8 @@ export class Ui extends BaseUi<Params> {
           args.denops,
           args.uiParams.promptPattern,
         );
-        await jobSendString(
-          args.denops,
-          this.#bufNr,
-          rawString`${commandLine}\<CR>`,
-        );
+
+        await this.#execute(args.denops, args.uiParams, commandLine);
       },
     },
     nextPrompt: {
@@ -185,7 +189,7 @@ export class Ui extends BaseUi<Params> {
         );
         await jobSendString(
           args.denops,
-          this.#bufNr,
+          this.#pty,
           rawString`${commandLine}`,
         );
       },
@@ -217,15 +221,16 @@ export class Ui extends BaseUi<Params> {
       callback: async (args: {
         denops: Denops;
         options: DdtOptions;
+        uiParams: Params;
         actionParams: BaseParams;
       }) => {
         const params = args.actionParams as SendParams;
 
-        await jobSendString(
-          args.denops,
-          this.#bufNr,
-          rawString`${params.str}\<CR>`,
-        );
+        if (!this.#pty) {
+          await this.#newPrompt(args.denops, args.uiParams, params.str);
+        }
+
+        await this.#execute(args.denops, args.uiParams, params.str);
       },
     },
   };
@@ -236,6 +241,7 @@ export class Ui extends BaseUi<Params> {
       floatingBorder: "",
       nvimServer: "",
       prompt: "%",
+      promptHighlight: "Identifier",
       promptPattern: "",
       shellHistoryMax: 500,
       split: "",
@@ -274,12 +280,30 @@ export class Ui extends BaseUi<Params> {
       await denops.cmd("startinsert");
     }
 
+    await fn.matchadd(
+      denops,
+      params.promptHighlight,
+      "^" + params.promptPattern,
+    );
+
     await this.#initOptions(denops, options);
 
-    await fn.setline(denops, 1, `${params.prompt} `);
+    await this.#newPrompt(denops, params);
+  }
+
+  async #newPrompt(denops: Denops, params: Params, commandLine: string = "") {
+    const maxLineNr = await fn.line(denops, "$");
+    const promptLines = [this.#cwd, `${params.prompt} ${commandLine}`];
+
+    if (maxLineNr == 1 && (await fn.getline(denops, "$")).length === 0) {
+      await fn.setline(denops, "$", promptLines);
+    } else {
+      await fn.append(denops, "$", promptLines);
+    }
+
     await fn.cursor(
       denops,
-      await fn.line(denops, "$") + 1,
+      maxLineNr + 2,
       await fn.col(denops, "$") + 1,
     );
 
@@ -344,7 +368,7 @@ export class Ui extends BaseUi<Params> {
     const cleanup = await fn.has(denops, "win32") ? "" : rawString`\<C-u>`;
     await jobSendString(
       denops,
-      this.#bufNr,
+      this.#pty,
       rawString`${cleanup}cd ${quote}${directory}${quote}\<CR>`,
     );
 
@@ -355,6 +379,52 @@ export class Ui extends BaseUi<Params> {
       "ddt_ui_last_directory",
       directory,
     );
+    this.#cwd = directory;
+  }
+
+  async #execute(denops: Denops, params: Params, commandLine: string) {
+    if (commandLine.length === 0) {
+      await this.#newPrompt(denops, params);
+      return;
+    }
+
+    if (!this.#pty) {
+      const [cmd, ...cmdArgs] = commandLine.split(" ");
+
+      this.#pty = new Pty({
+        cmd,
+        args: cmdArgs,
+        env: [],
+        cwd: this.#cwd,
+      });
+
+      while (true) {
+        const { data, done } = await this.#pty.read();
+        if (done) {
+          this.#pty.close();
+          this.#pty = null;
+          break;
+        }
+
+        //console.log(data);
+        await fn.appendbufline(
+          denops,
+          this.#bufNr,
+          "$",
+          data.split(/\r?\n/),
+        );
+
+        await new Promise((r) => setTimeout(r, 20));
+      }
+
+      await this.#newPrompt(denops, params);
+    } else {
+      await jobSendString(
+        denops,
+        this.#pty,
+        rawString`${commandLine}\<CR>`,
+      );
+    }
   }
 }
 
@@ -405,25 +475,15 @@ async function getCommandLine(
 
 async function jobSendString(
   denops: Denops,
-  _bufNr: number,
-  _keys: RawString,
+  pty: Pty | null,
+  keys: RawString,
 ) {
-  await useEval(denops, async (_denops: Denops) => {
-    // TODO
-    const pty = new Pty({
-      cmd: "bash",
-      args: [],
-      env: [],
-    });
+  if (!pty) {
+    return;
+  }
 
-    // executs ls -la repedetly and shows output
-    while (true) {
-      await pty.write("ls -la\n");
-      const { data, done } = await pty.read();
-      if (done) break;
-      console.log(data);
-      await new Promise((r) => setTimeout(r, 100));
-    }
+  await useEval(denops, async (_denops: Denops) => {
+    await pty.write(keys);
   });
 }
 

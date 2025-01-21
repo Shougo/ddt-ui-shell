@@ -89,12 +89,19 @@ prompt		string
 
 		Default: "%"
 
+                                          *ddt-ui-shell-param-promptHighlight*
+promptHighlight	string
+		Sets the highight group name which matches the shell prompt.
+
+		Default: "Identifier"
+
                                             *ddt-ui-shell-param-promptPattern*
 promptPattern	string
 		Sets the pattern which matches the shell prompt.
 		NOTE: The right prompt is not supported.
 
 		Default: "\w*% \?"
+
                                                     *ddt-ui-shell-param-split*
 split
 		Specify the split direction.
