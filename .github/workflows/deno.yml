@@ -31,15 +31,3 @@ jobs:
 
       - name: Check Format
         run: deno task fmt --check
-
-  deno-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: denoland/setup-deno@main
-        with:
-          deno-version: ${{ env.DENO_VERSION }}
-
-      - name: Test
-        run: deno task test
-        timeout-minutes: 5

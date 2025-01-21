@@ -265,7 +265,8 @@ export class Ui extends BaseUi<Params> {
 
     await denops.call("ddt#ui#shell#_split", params);
 
-    this.#bufNr = await fn.bufnr(denops, "%");
+    const bufferName = `ddt-shell-${options.name}`;
+    this.#bufNr = await fn.bufadd(denops, bufferName);
 
     if (params.startInsert) {
       await denops.cmd("startinsert");
