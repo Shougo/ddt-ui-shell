@@ -116,8 +116,6 @@ export class Ui extends BaseUi<Params> {
         const params = args.actionParams as CdParams;
 
         await this.#cd(args.denops, args.uiParams, params.directory);
-
-        await this.#newPrompt(args.denops, args.uiParams);
       },
     },
     executeLine: {
@@ -309,11 +307,16 @@ export class Ui extends BaseUi<Params> {
   }
 
   async #newPrompt(denops: Denops, params: Params, commandLine: string = "") {
-    const maxLineNr = await fn.line(denops, "$");
     this.#prompt = `${params.prompt} ${commandLine}`;
     const promptLines = [this.#cwd, this.#prompt];
+    const lastLine = await fn.getline(denops, "$");
 
-    if (maxLineNr == 1 && (await fn.getline(denops, "$")).length === 0) {
+    if (lastLine.length === 0 || lastLine === params.prompt + " ") {
+      await fn.deletebufline(
+        denops,
+        this.#bufNr,
+        await fn.line(denops, "$") - 1,
+      );
       await fn.setline(denops, "$", promptLines);
     } else {
       await fn.append(denops, "$", promptLines);
@@ -401,6 +404,8 @@ export class Ui extends BaseUi<Params> {
       directory,
     );
     this.#cwd = directory;
+
+    await this.#newPrompt(denops, params);
   }
 
   async #execute(denops: Denops, params: Params, commandLine: string) {
