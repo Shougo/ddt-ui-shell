@@ -54,6 +54,10 @@ cd
 executeLine
 		Execute the command line.
 
+                                               *ddu-ui-shell-action-terminate*
+terminate
+		Terminate the current command.
+
                                               *ddu-ui-shell-action-nextPrompt*
 nextPrompt
 		Move to the next prompt from cursor.

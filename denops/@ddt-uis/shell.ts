@@ -146,6 +146,27 @@ export class Ui extends BaseUi<Params> {
         );
       },
     },
+    terminate: {
+      description: "Terminate the current command",
+      callback: async (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiParams: Params;
+      }) => {
+        if (
+          await fn.bufnr(args.denops, "%") != this.#bufNr
+        ) {
+          return;
+        }
+
+        if (this.#pty) {
+          this.#pty.close();
+          this.#pty = null;
+        } else {
+          await this.#newPrompt(args.denops, args.uiParams);
+        }
+      },
+    },
     nextPrompt: {
       description: "Move to the next prompt from cursor",
       callback: async (args: {
@@ -399,6 +420,10 @@ export class Ui extends BaseUi<Params> {
       });
 
       while (true) {
+        if (!this.#pty) {
+          break;
+        }
+
         const { data, done } = await this.#pty.read();
         if (done) {
           this.#pty.close();
@@ -411,7 +436,7 @@ export class Ui extends BaseUi<Params> {
             denops,
             this.#bufNr,
             "$",
-            data.split(/\r?\n/),
+            data.split(/\r?\n/).filter((str) => str.length > 0),
           );
 
           await this.#moveCursorLast(denops);
