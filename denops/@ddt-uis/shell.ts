@@ -9,11 +9,6 @@ import type { Denops } from "jsr:@denops/std@~7.4.0";
 import * as fn from "jsr:@denops/std@~7.4.0/function";
 import * as vars from "jsr:@denops/std@~7.4.0/variable";
 import { batch } from "jsr:@denops/std@~7.4.0/batch";
-import {
-  type RawString,
-  rawString,
-  useEval,
-} from "jsr:@denops/std@~7.4.0/eval";
 import { Pty } from "jsr:@sigma/pty-ffi@~0.26.4";
 
 export type Params = {
@@ -44,6 +39,7 @@ type SendParams = {
 export class Ui extends BaseUi<Params> {
   #bufNr = -1;
   #cwd = "";
+  #prompt = "";
   #pty: Pty | null = null;
 
   override async redraw(args: {
@@ -83,8 +79,6 @@ export class Ui extends BaseUi<Params> {
 
   override async getInput(args: {
     denops: Denops;
-    options: DdtOptions;
-    uiOptions: UiOptions;
     uiParams: Params;
   }): Promise<string> {
     if (
@@ -97,6 +91,7 @@ export class Ui extends BaseUi<Params> {
     const commandLine = await getCommandLine(
       args.denops,
       args.uiParams.promptPattern,
+      this.#prompt,
     );
 
     const col = await fn.col(args.denops, ".");
@@ -120,7 +115,7 @@ export class Ui extends BaseUi<Params> {
 
         const params = args.actionParams as CdParams;
 
-        await this.#cd(args.denops, params.directory);
+        await this.#cd(args.denops, args.uiParams, params.directory);
 
         await this.#newPrompt(args.denops, args.uiParams);
       },
@@ -139,12 +134,16 @@ export class Ui extends BaseUi<Params> {
           return;
         }
 
-        const commandLine = await getCommandLine(
+        const commandLine = await fn.getline(
           args.denops,
-          args.uiParams.promptPattern,
-        );
+          ".",
+        ) as string;
 
-        await this.#execute(args.denops, args.uiParams, commandLine);
+        await this.#execute(
+          args.denops,
+          args.uiParams,
+          commandLine.slice(this.#prompt.length),
+        );
       },
     },
     nextPrompt: {
@@ -183,15 +182,12 @@ export class Ui extends BaseUi<Params> {
           return;
         }
 
-        const commandLine = await getCommandLine(
-          args.denops,
-          args.uiParams.promptPattern,
-        );
-        await jobSendString(
-          args.denops,
-          this.#pty,
-          rawString`${commandLine}`,
-        );
+        const commandLine = await this.getInput({
+          denops: args.denops,
+          uiParams: args.uiParams,
+        });
+
+        await this.#newPrompt(args.denops, args.uiParams, commandLine);
       },
     },
     previousPrompt: {
@@ -261,7 +257,7 @@ export class Ui extends BaseUi<Params> {
 
     // Check current directory
     if (this.#cwd !== "" && newCwd !== this.#cwd) {
-      await this.#cd(denops, newCwd);
+      await this.#cd(denops, params, newCwd);
     }
   }
 
@@ -293,7 +289,8 @@ export class Ui extends BaseUi<Params> {
 
   async #newPrompt(denops: Denops, params: Params, commandLine: string = "") {
     const maxLineNr = await fn.line(denops, "$");
-    const promptLines = [this.#cwd, `${params.prompt} ${commandLine}`];
+    this.#prompt = `${params.prompt} ${commandLine}`;
+    const promptLines = [this.#cwd, this.#prompt];
 
     if (maxLineNr == 1 && (await fn.getline(denops, "$")).length === 0) {
       await fn.setline(denops, "$", promptLines);
@@ -301,13 +298,23 @@ export class Ui extends BaseUi<Params> {
       await fn.append(denops, "$", promptLines);
     }
 
+    await fn.setbufvar(denops, this.#bufNr, "&modified", false);
+
+    await this.#moveCursorLast(denops);
+  }
+
+  async #moveCursorLast(denops: Denops) {
     await fn.cursor(
       denops,
-      maxLineNr + 2,
-      await fn.col(denops, "$") + 1,
+      await fn.line(denops, "$"),
+      0,
     );
 
-    await fn.setbufvar(denops, this.#bufNr, "&modified", false);
+    await fn.cursor(
+      denops,
+      0,
+      await fn.col(denops, "$") + 1,
+    );
   }
 
   async #winId(denops: Denops): Promise<number> {
@@ -358,21 +365,14 @@ export class Ui extends BaseUi<Params> {
     );
   }
 
-  async #cd(denops: Denops, directory: string) {
+  async #cd(denops: Denops, params: Params, directory: string) {
     const stat = await safeStat(directory);
     if (!stat || !stat.isDirectory) {
       return;
     }
 
     const quote = await fn.has(denops, "win32") ? '"' : "'";
-    const cleanup = await fn.has(denops, "win32") ? "" : rawString`\<C-u>`;
-    await jobSendString(
-      denops,
-      this.#pty,
-      rawString`${cleanup}cd ${quote}${directory}${quote}\<CR>`,
-    );
-
-    await termRedraw(denops, this.#bufNr);
+    await this.#newPrompt(denops, params, `cd ${quote}${directory}${quote}`);
 
     await vars.t.set(
       denops,
@@ -406,37 +406,26 @@ export class Ui extends BaseUi<Params> {
           break;
         }
 
-        //console.log(data);
-        await fn.appendbufline(
-          denops,
-          this.#bufNr,
-          "$",
-          data.split(/\r?\n/),
-        );
+        if (data.length > 0) {
+          await fn.appendbufline(
+            denops,
+            this.#bufNr,
+            "$",
+            data.split(/\r?\n/),
+          );
+
+          await this.#moveCursorLast(denops);
+          this.#prompt = await fn.getline(denops, "$");
+        }
 
         await new Promise((r) => setTimeout(r, 20));
       }
 
       await this.#newPrompt(denops, params);
     } else {
-      await jobSendString(
-        denops,
-        this.#pty,
-        rawString`${commandLine}\<CR>`,
-      );
+      await this.#pty.write(commandLine + "\n");
     }
   }
-}
-
-async function stopInsert(denops: Denops) {
-  await useEval(denops, async (denops: Denops) => {
-    if (denops.meta.host === "nvim") {
-      await denops.cmd("stopinsert");
-    } else {
-      await denops.cmd("sleep 50m");
-      await fn.feedkeys(denops, rawString`\<C-\>\<C-n>`, "n");
-    }
-  });
 }
 
 async function searchPrompt(
@@ -467,53 +456,20 @@ async function searchPrompt(
 async function getCommandLine(
   denops: Denops,
   promptPattern: string,
+  lastPrompt: string,
   lineNr: string | number = ".",
 ) {
   const currentLine = await fn.getline(denops, lineNr);
-  return await fn.substitute(denops, currentLine, promptPattern, "", "");
-}
-
-async function jobSendString(
-  denops: Denops,
-  pty: Pty | null,
-  keys: RawString,
-) {
-  if (!pty) {
-    return;
-  }
-
-  await useEval(denops, async (_denops: Denops) => {
-    await pty.write(keys);
-  });
-}
-
-async function termRedraw(
-  denops: Denops,
-  bufNr: number,
-) {
-  if (denops.meta.host === "nvim") {
-    await denops.cmd("redraw");
-    return;
-  }
-
-  // NOTE: In Vim8, auto redraw does not work!
-  const ids = await fn.win_findbuf(denops, bufNr);
-  if (ids.length === 0) {
-    return;
-  }
-
-  const prevWinId = await fn.win_getid(denops);
-
-  await fn.win_gotoid(denops, ids[0]);
-
-  // Goto insert mode
-  await denops.cmd("redraw");
-  await denops.cmd("normal! A");
-
-  // Go back to normal mode
-  await stopInsert(denops);
-
-  await fn.win_gotoid(denops, prevWinId);
+  const substitute = await fn.substitute(
+    denops,
+    currentLine,
+    promptPattern,
+    "",
+    "",
+  );
+  return currentLine === substitute
+    ? currentLine.slice(lastPrompt.length)
+    : substitute;
 }
 
 const safeStat = async (path: string): Promise<Deno.FileInfo | null> => {
