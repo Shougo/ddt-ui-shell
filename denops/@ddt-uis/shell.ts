@@ -132,15 +132,16 @@ export class Ui extends BaseUi<Params> {
           return;
         }
 
-        const commandLine = await fn.getline(
+        const commandLine = await getCommandLine(
           args.denops,
-          ".",
-        ) as string;
+          args.uiParams.promptPattern,
+          this.#prompt,
+        );
 
         await this.#execute(
           args.denops,
           args.uiParams,
-          commandLine.slice(this.#prompt.length),
+          commandLine,
         );
       },
     },
@@ -201,10 +202,11 @@ export class Ui extends BaseUi<Params> {
           return;
         }
 
-        const commandLine = await this.getInput({
-          denops: args.denops,
-          uiParams: args.uiParams,
-        });
+        const commandLine = await getCommandLine(
+          args.denops,
+          args.uiParams.promptPattern,
+          this.#prompt,
+        );
 
         await this.#newPrompt(args.denops, args.uiParams, commandLine);
       },
