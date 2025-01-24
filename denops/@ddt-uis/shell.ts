@@ -10,6 +10,7 @@ import type { Denops } from "jsr:@denops/std@~7.4.0";
 import * as fn from "jsr:@denops/std@~7.4.0/function";
 import * as vars from "jsr:@denops/std@~7.4.0/variable";
 import { batch } from "jsr:@denops/std@~7.4.0/batch";
+import * as autocmd from "jsr:@denops/std@~7.4.0/autocmd";
 
 import { join } from "jsr:@std/path@~1.0.3/join";
 import { resolve } from "jsr:@std/path@~1.0.3/resolve";
@@ -80,7 +81,12 @@ export class Ui extends BaseUi<Params> {
       await this.#newBuffer(args.denops, args.options, args.uiParams);
     }
 
-    await this.#initVariables(args.denops, args.options.name, cwd);
+    await this.#initVariables(
+      args.denops,
+      args.options.name,
+      cwd,
+      args.uiParams.promptPattern,
+    );
   }
 
   override async getInput(args: {
@@ -321,7 +327,19 @@ export class Ui extends BaseUi<Params> {
       "^" + params.promptPattern,
     );
 
-    await this.#initOptions(denops, options);
+    await this.#initOptions(denops);
+
+    await autocmd.group(
+      denops,
+      "ddt-shell",
+      (helper: autocmd.GroupHelper) => {
+        helper.define(
+          "CursorMovedI",
+          "<buffer>",
+          "call ddt#ui#shell#_check_prompt()",
+        );
+      },
+    );
 
     await this.#newPrompt(denops, params);
   }
@@ -366,13 +384,11 @@ export class Ui extends BaseUi<Params> {
     return winIds.length > 0 ? winIds[0] : -1;
   }
 
-  async #initOptions(denops: Denops, options: DdtOptions) {
+  async #initOptions(denops: Denops) {
     const winid = await this.#winId(denops);
     const existsStatusColumn = await fn.exists(denops, "+statuscolumn");
 
     await batch(denops, async (denops: Denops) => {
-      await fn.setbufvar(denops, this.#bufNr, "ddt_ui_name", options.name);
-
       // Set options
       await fn.setwinvar(denops, winid, "&list", 0);
       await fn.setwinvar(denops, winid, "&foldenable", 0);
@@ -396,8 +412,14 @@ export class Ui extends BaseUi<Params> {
     await fn.setbufvar(denops, this.#bufNr, "&filetype", "ddt-shell");
   }
 
-  async #initVariables(denops: Denops, name: string, cwd: string) {
+  async #initVariables(
+    denops: Denops,
+    name: string,
+    cwd: string,
+    promptPattern: string,
+  ) {
     await vars.b.set(denops, "ddt_ui_name", name);
+    await vars.b.set(denops, "ddt_ui_shell_prompt_pattern", promptPattern);
 
     await vars.t.set(denops, "ddt_ui_last_bufnr", this.#bufNr);
     await vars.t.set(denops, "ddt_ui_last_directory", cwd);
@@ -506,24 +528,23 @@ async function searchPrompt(
   promptPattern: string,
   flags: string,
 ) {
-  const currentCol = await fn.col(denops, ".");
   await fn.cursor(denops, 0, 1);
   const pattern = `^\\%(${promptPattern}\\m\\).\\?`;
   const pos = await fn.searchpos(denops, pattern, flags) as number[];
-  if (pos[0] != 0) {
-    const col = await fn.matchend(
-      denops,
-      await fn.getline(denops, pos[0]),
-      pattern,
-    );
-    await fn.cursor(
-      denops,
-      pos[0],
-      col,
-    );
-  } else {
-    await fn.cursor(denops, 0, currentCol);
+  if (pos[0] == 0) {
+    return;
   }
+
+  const col = await fn.matchend(
+    denops,
+    await fn.getline(denops, pos[0]),
+    pattern,
+  );
+  await fn.cursor(
+    denops,
+    pos[0],
+    col,
+  );
 }
 
 async function getCommandLine(
