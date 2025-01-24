@@ -291,6 +291,16 @@ export class Ui extends BaseUi<Params> {
   }
 
   async #newBuffer(denops: Denops, options: DdtOptions, params: Params) {
+    if (params.prompt.length === 0) {
+      printError(denops, "prompt param must be set.");
+      return;
+    }
+
+    if (params.promptPattern.length === 0) {
+      printError(denops, "promptPattern param must be set.");
+      return;
+    }
+
     // Set $EDITOR
     await denops.call("ddt#ui#shell#_set_editor", params.nvimServer);
 
