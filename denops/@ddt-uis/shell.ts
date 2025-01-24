@@ -4,11 +4,17 @@ import type {
   UiOptions,
 } from "jsr:@shougo/ddt-vim@~1.0.0/types";
 import { BaseUi, type UiActions } from "jsr:@shougo/ddt-vim@~1.0.0/ui";
+import { printError } from "jsr:@shougo/ddt-vim@~1.0.0/utils";
 
 import type { Denops } from "jsr:@denops/std@~7.4.0";
 import * as fn from "jsr:@denops/std@~7.4.0/function";
 import * as vars from "jsr:@denops/std@~7.4.0/variable";
 import { batch } from "jsr:@denops/std@~7.4.0/batch";
+
+import { join } from "jsr:@std/path@~1.0.3/join";
+import { resolve } from "jsr:@std/path@~1.0.3/resolve";
+import { isAbsolute } from "jsr:@std/path@~1.0.2/is-absolute";
+import { assertEquals } from "jsr:@std/assert@~1.0.2/equals";
 import { Pty } from "jsr:@sigma/pty-ffi@~0.26.4";
 
 export type Params = {
@@ -115,6 +121,7 @@ export class Ui extends BaseUi<Params> {
 
         const params = args.actionParams as CdParams;
 
+        await this.#newCdPrompt(args.denops, args.uiParams, params.directory);
         await this.#cd(args.denops, args.uiParams, params.directory);
       },
     },
@@ -278,6 +285,7 @@ export class Ui extends BaseUi<Params> {
 
     // Check current directory
     if (this.#cwd !== "" && newCwd !== this.#cwd) {
+      await this.#newCdPrompt(denops, params, newCwd);
       await this.#cd(denops, params, newCwd);
     }
   }
@@ -394,11 +402,9 @@ export class Ui extends BaseUi<Params> {
   async #cd(denops: Denops, params: Params, directory: string) {
     const stat = await safeStat(directory);
     if (!stat || !stat.isDirectory) {
+      printError(denops, `${directory} is not directory.`);
       return;
     }
-
-    const quote = await fn.has(denops, "win32") ? '"' : "'";
-    await this.#newPrompt(denops, params, `cd ${quote}${directory}${quote}`);
 
     await vars.t.set(
       denops,
@@ -410,6 +416,11 @@ export class Ui extends BaseUi<Params> {
     await this.#newPrompt(denops, params);
   }
 
+  async #newCdPrompt(denops: Denops, params: Params, directory: string) {
+    const quote = await fn.has(denops, "win32") ? '"' : "'";
+    await this.#newPrompt(denops, params, `cd ${quote}${directory}${quote}`);
+  }
+
   async #execute(denops: Denops, params: Params, commandLine: string) {
     if (commandLine.length === 0) {
       await this.#newPrompt(denops, params);
@@ -417,7 +428,27 @@ export class Ui extends BaseUi<Params> {
     }
 
     if (!this.#pty) {
-      const [cmd, ...cmdArgs] = commandLine.split(" ");
+      const [cmd, ...cmdArgs] = parseCommandLine(commandLine);
+      if (cmd === "cd") {
+        await this.#cd(
+          denops,
+          params,
+          cmdArgs.length > 0 ? cmdArgs[0] : Deno.env.get("HOME") ?? "",
+        );
+        return;
+      }
+
+      // cmd is Directory?
+      const isAbs = isAbsolute(cmd);
+      if (isAbs || cmd.startsWith("./") || cmd.startsWith("..")) {
+        const dirPath = isAbs ? cmd : resolve(join(this.#cwd, cmd));
+        const stat = await safeStat(dirPath);
+        if (stat && stat.isDirectory) {
+          // auto_cd
+          await this.#cd(denops, params, dirPath);
+          return;
+        }
+      }
 
       this.#pty = new Pty({
         cmd,
@@ -504,6 +535,21 @@ async function getCommandLine(
     : substitute;
 }
 
+function parseCommandLine(input: string): string[] {
+  // Use a regular expression to split the input string by spaces, handling
+  // quotes
+  const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/gi;
+  const result: string[] = [];
+
+  let match = regex.exec(input);
+  while (match) {
+    result.push(match[1] ?? match[2] ?? match[0]);
+    match = regex.exec(input);
+  }
+
+  return result;
+}
+
 const safeStat = async (path: string): Promise<Deno.FileInfo | null> => {
   // NOTE: Deno.stat() may be failed
   try {
@@ -523,3 +569,23 @@ const safeStat = async (path: string): Promise<Deno.FileInfo | null> => {
   }
   return null;
 };
+
+Deno.test("parseCommandLine should split a simple command", () => {
+  assertEquals(parseCommandLine("ls -la"), ["ls", "-la"]);
+});
+
+Deno.test("parseCommandLine should handle double quotes", () => {
+  assertEquals(parseCommandLine('echo "Hello World"'), ["echo", "Hello World"]);
+});
+
+Deno.test("parseCommandLine should handle single quotes", () => {
+  assertEquals(parseCommandLine("echo 'Hello World'"), ["echo", "Hello World"]);
+});
+
+Deno.test("parseCommandLine should handle multiple spaces", () => {
+  assertEquals(parseCommandLine("  ls    -la   "), ["ls", "-la"]);
+});
+
+Deno.test("parseCommandLine should handle empty input", () => {
+  assertEquals(parseCommandLine(""), []);
+});
