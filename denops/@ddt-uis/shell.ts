@@ -26,6 +26,7 @@ export type Params = {
   promptHighlight: string;
   promptPattern: string;
   shellHistoryMax: number;
+  shellHistoryPath: string;
   split: string;
   startInsert: boolean;
   toggle: boolean;
@@ -47,6 +48,7 @@ export class Ui extends BaseUi<Params> {
   #bufNr = -1;
   #cwd = "";
   #prompt = "";
+  #history: string[] = [];
   #pty: Pty | null = null;
 
   override async redraw(args: {
@@ -274,6 +276,7 @@ export class Ui extends BaseUi<Params> {
       promptHighlight: "Identifier",
       promptPattern: "",
       shellHistoryMax: 500,
+      shellHistoryPath: "",
       split: "",
       startInsert: false,
       toggle: false,
@@ -448,9 +451,17 @@ export class Ui extends BaseUi<Params> {
     await this.#newPrompt(denops, params);
   }
 
+  #appendHistory(params: Params, commandLine: string) {
+    this.#history.push(commandLine);
+    this.#history = this.#history.slice(-params.shellHistoryMax);
+  }
+
   async #newCdPrompt(denops: Denops, params: Params, directory: string) {
     const quote = await fn.has(denops, "win32") ? '"' : "'";
-    await this.#newPrompt(denops, params, `cd ${quote}${directory}${quote}`);
+    const commandLine = `cd ${quote}${directory}${quote}`;
+    await this.#newPrompt(denops, params, commandLine);
+
+    this.#appendHistory(params, commandLine);
   }
 
   async #execute(denops: Denops, params: Params, commandLine: string) {
@@ -458,6 +469,8 @@ export class Ui extends BaseUi<Params> {
       await this.#newPrompt(denops, params);
       return;
     }
+
+    this.#appendHistory(params, commandLine);
 
     if (!this.#pty) {
       const [cmd, ...cmdArgs] = parseCommandLine(commandLine);

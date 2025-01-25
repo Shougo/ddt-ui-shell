@@ -106,6 +106,18 @@ promptPattern	string
 
 		Default: "\w*% \?"
 
+                                          *ddt-ui-shell-param-shellHistoryMax*
+shellHistoryMax
+		Specify the history max of the shell.
+
+		Default: 500
+
+                                         *ddt-ui-shell-param-shellHistoryPath*
+shellHistoryPath
+		Specify the history path of the shell.
+
+		Default: ""
+
                                                     *ddt-ui-shell-param-split*
 split
 		Specify the split direction.
