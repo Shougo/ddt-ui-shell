@@ -11,6 +11,7 @@ Interface		|ddt-ui-shell-interface|
   Functions		  |ddt-ui-shell-functions|
   Actions		  |ddt-ui-shell-actions|
   Params		  |ddt-ui-shell-params|
+  Builtin Commands	  |ddt-ui-shell-builtins|
 Examples		|ddt-ui-shell-examples|
 FAQ			|ddt-ui-shell-faq|
 Compatibility		|ddt-ui-shell-compatibility|
@@ -166,6 +167,17 @@ winWidth	number
 		of the floating window.
 
 		Default: 80
+
+------------------------------------------------------------------------------
+Builtin Commands                                       *ddt-ui-shell-builtins*
+
+                                                     *ddu-ui-shell-builtin-cd*
+cd [{directory}]
+		params:
+			{directory}: New current directory.
+
+		Change current directory to {directory}.
+
 
 ==============================================================================
 EXAMPLES                                               *ddt-ui-shell-examples*

@@ -44,6 +44,23 @@ type SendParams = {
   str: string;
 };
 
+type BuiltinCommand = {
+  description: string;
+  callback: BuiltinCallback;
+};
+
+type BuiltinArguments<Params extends BaseParams> = {
+  denops: Denops;
+  options: DdtOptions;
+  uiOptions: UiOptions;
+  uiParams: Params;
+  cmdArgs: string[];
+};
+
+export type BuiltinCallback = (
+  args: BuiltinArguments<Params>,
+) => Promise<number>;
+
 export class Ui extends BaseUi<Params> {
   #bufNr = -1;
   #cwd = "";
@@ -138,6 +155,7 @@ export class Ui extends BaseUi<Params> {
       callback: async (args: {
         denops: Denops;
         options: DdtOptions;
+        uiOptions: UiOptions;
         uiParams: Params;
       }) => {
         if (
@@ -155,6 +173,8 @@ export class Ui extends BaseUi<Params> {
 
         await this.#execute(
           args.denops,
+          args.options,
+          args.uiOptions,
           args.uiParams,
           commandLine,
         );
@@ -253,6 +273,7 @@ export class Ui extends BaseUi<Params> {
       callback: async (args: {
         denops: Denops;
         options: DdtOptions;
+        uiOptions: UiOptions;
         uiParams: Params;
         actionParams: BaseParams;
       }) => {
@@ -262,7 +283,13 @@ export class Ui extends BaseUi<Params> {
           await this.#newPrompt(args.denops, args.uiParams, params.str);
         }
 
-        await this.#execute(args.denops, args.uiParams, params.str);
+        await this.#execute(
+          args.denops,
+          args.options,
+          args.uiOptions,
+          args.uiParams,
+          params.str,
+        );
       },
     },
   };
@@ -286,6 +313,28 @@ export class Ui extends BaseUi<Params> {
       winWidth: 80,
     };
   }
+
+  #builtins: Record<string, BuiltinCommand> = {
+    cd: {
+      description: "Change current directory",
+      callback: async (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiParams: Params;
+        cmdArgs: string[];
+      }) => {
+        await this.#cd(
+          args.denops,
+          args.uiParams,
+          args.cmdArgs.length > 0
+            ? args.cmdArgs[0]
+            : Deno.env.get("HOME") ?? "",
+        );
+
+        return 0;
+      },
+    },
+  };
 
   async #switchBuffer(denops: Denops, params: Params, newCwd: string) {
     await denops.call("ddt#ui#shell#_split", params);
@@ -464,22 +513,33 @@ export class Ui extends BaseUi<Params> {
     this.#appendHistory(params, commandLine);
   }
 
-  async #execute(denops: Denops, params: Params, commandLine: string) {
+  async #execute(
+    denops: Denops,
+    options: DdtOptions,
+    uiOptions: UiOptions,
+    uiParams: Params,
+    commandLine: string,
+  ) {
     if (commandLine.length === 0) {
-      await this.#newPrompt(denops, params);
+      await this.#newPrompt(denops, uiParams);
       return;
     }
 
-    this.#appendHistory(params, commandLine);
+    this.#appendHistory(uiParams, commandLine);
 
     if (!this.#pty) {
       const [cmd, ...cmdArgs] = parseCommandLine(commandLine);
-      if (cmd === "cd") {
-        await this.#cd(
+
+      // Builtin commands
+      if (this.#builtins[cmd]) {
+        await this.#builtins[cmd].callback({
           denops,
-          params,
-          cmdArgs.length > 0 ? cmdArgs[0] : Deno.env.get("HOME") ?? "",
-        );
+          options,
+          uiOptions,
+          uiParams,
+          cmdArgs,
+        });
+
         return;
       }
 
@@ -490,7 +550,7 @@ export class Ui extends BaseUi<Params> {
         const stat = await safeStat(dirPath);
         if (stat && stat.isDirectory) {
           // auto_cd
-          await this.#cd(denops, params, dirPath);
+          await this.#cd(denops, uiParams, dirPath);
           return;
         }
       }
@@ -529,7 +589,7 @@ export class Ui extends BaseUi<Params> {
         await new Promise((r) => setTimeout(r, 20));
       }
 
-      await this.#newPrompt(denops, params);
+      await this.#newPrompt(denops, uiParams);
     } else {
       await this.#pty.write(commandLine + "\n");
     }
