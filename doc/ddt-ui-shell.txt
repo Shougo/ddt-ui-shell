@@ -178,6 +178,9 @@ cd [{directory}]
 
 		Change current directory to {directory}.
 
+                                                *ddu-ui-shell-builtin-history*
+history
+		Print current history list.
 
 ==============================================================================
 EXAMPLES                                               *ddt-ui-shell-examples*

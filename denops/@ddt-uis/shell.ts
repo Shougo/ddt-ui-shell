@@ -334,6 +334,21 @@ export class Ui extends BaseUi<Params> {
         return 0;
       },
     },
+    history: {
+      description: "Print current history list",
+      callback: async (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiParams: Params;
+        cmdArgs: string[];
+      }) => {
+        for (const history of this.#history) {
+          await fn.append(args.denops, "$", history);
+        }
+
+        return 0;
+      },
+    },
   };
 
   async #switchBuffer(denops: Denops, params: Params, newCwd: string) {
@@ -539,6 +554,8 @@ export class Ui extends BaseUi<Params> {
           uiParams,
           cmdArgs,
         });
+
+        await this.#newPrompt(denops, uiParams);
 
         return;
       }
