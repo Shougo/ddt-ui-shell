@@ -21,7 +21,6 @@ import { Pty } from "jsr:@sigma/pty-ffi@~0.26.4";
 export type Params = {
   cwd: string;
   floatingBorder: string;
-  nvimServer: string;
   prompt: string;
   promptHighlight: string;
   promptPattern: string;
@@ -298,7 +297,6 @@ export class Ui extends BaseUi<Params> {
     return {
       cwd: "",
       floatingBorder: "",
-      nvimServer: "",
       prompt: "%",
       promptHighlight: "Identifier",
       promptPattern: "",
@@ -373,9 +371,6 @@ export class Ui extends BaseUi<Params> {
       printError(denops, "promptPattern param must be set.");
       return;
     }
-
-    // Set $EDITOR
-    await denops.call("ddt#ui#shell#_set_editor", params.nvimServer);
 
     await denops.call("ddt#ui#shell#_split", params);
 
