@@ -64,7 +64,6 @@ export class Ui extends BaseUi<Params> {
   #bufNr = -1;
   #cwd = "";
   #prompt = "";
-  #history: string[] = [];
   #pty: Pty | null = null;
 
   override async redraw(args: {
@@ -340,7 +339,9 @@ export class Ui extends BaseUi<Params> {
         uiParams: Params;
         cmdArgs: string[];
       }) => {
-        for (const history of this.#history) {
+        for await (
+          const history of await getHistory(args.denops, args.uiParams)
+        ) {
           await fn.append(args.denops, "$", history);
         }
 
@@ -510,17 +511,12 @@ export class Ui extends BaseUi<Params> {
     await this.#newPrompt(denops, params);
   }
 
-  #appendHistory(params: Params, commandLine: string) {
-    this.#history.push(commandLine);
-    this.#history = this.#history.slice(-params.shellHistoryMax);
-  }
-
   async #newCdPrompt(denops: Denops, params: Params, directory: string) {
     const quote = await fn.has(denops, "win32") ? '"' : "'";
     const commandLine = `cd ${quote}${directory}${quote}`;
     await this.#newPrompt(denops, params, commandLine);
 
-    this.#appendHistory(params, commandLine);
+    await appendHistory(denops, params, commandLine);
   }
 
   async #execute(
@@ -535,7 +531,7 @@ export class Ui extends BaseUi<Params> {
       return;
     }
 
-    this.#appendHistory(uiParams, commandLine);
+    await appendHistory(denops, uiParams, commandLine);
 
     if (!this.#pty) {
       const [cmd, ...cmdArgs] = parseCommandLine(commandLine);
@@ -659,11 +655,56 @@ function parseCommandLine(input: string): string[] {
 
   let match = regex.exec(input);
   while (match) {
-    result.push(match[1] ?? match[2] ?? match[0]);
+    result.push(expandArg(match[1] ?? match[2] ?? match[0]));
     match = regex.exec(input);
   }
 
   return result;
+}
+
+function expandArg(arg: string): string {
+  const home = Deno.env.get("HOME");
+  if (home && home !== "") {
+    // Replace home directory
+    arg = arg.replace(/^~/, home);
+  }
+
+  return arg;
+}
+
+async function getHistory(denops: Denops, params: Params): Promise<string[]> {
+  if (params.shellHistoryPath.length === 0) {
+    return [];
+  }
+
+  const stat = await safeStat(params.shellHistoryPath);
+  if (!stat) {
+    return [];
+  }
+
+  try {
+    const content = await Deno.readTextFile(params.shellHistoryPath);
+    return content.split("\n").filter((line: string) => line.trim() !== "");
+  } catch (error) {
+    printError(denops, "Error reading history file:", error);
+    return [];
+  }
+}
+
+async function appendHistory(
+  denops: Denops,
+  params: Params,
+  commandLine: string,
+) {
+  try {
+    let history = await getHistory(denops, params);
+    history.push(commandLine);
+    history = history.slice(-params.shellHistoryMax);
+    await Deno.writeTextFile(params.shellHistoryPath, history.join("\n"));
+  } catch (error) {
+    printError(denops, "Error reading history file:", error);
+    throw error;
+  }
 }
 
 const safeStat = async (path: string): Promise<Deno.FileInfo | null> => {
