@@ -563,10 +563,12 @@ export class Ui extends BaseUi<Params> {
         }
       }
 
+      // NOTE: EDITOR env must be set to support "git commit".
+      const editor = await fn.expand(denops, "$EDITOR") as string ?? "";
       this.#pty = new Pty({
         cmd,
         args: cmdArgs,
-        env: [],
+        env: [["EDITOR", editor], ["GIT_EDITOR", editor]],
         cwd: this.#cwd,
       });
 
