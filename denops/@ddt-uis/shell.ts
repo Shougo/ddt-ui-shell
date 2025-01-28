@@ -21,6 +21,7 @@ import { Pty } from "jsr:@sigma/pty-ffi@~0.26.4";
 export type Params = {
   cwd: string;
   floatingBorder: string;
+  passwordPattern: string;
   prompt: string;
   promptHighlight: string;
   promptPattern: string;
@@ -296,6 +297,9 @@ export class Ui extends BaseUi<Params> {
     return {
       cwd: "",
       floatingBorder: "",
+      passwordPattern: "(Enter |Repeat |[Oo]ld |[Nn]ew |login " +
+        "|Kerberos |EncFS |CVS |UNIX | SMB |LDAP |\\[sudo\\] )" +
+        "([Pp]assword|[Pp]assphrase)",
       prompt: "%",
       promptHighlight: "Identifier",
       promptPattern: "",
@@ -572,6 +576,8 @@ export class Ui extends BaseUi<Params> {
         cwd: this.#cwd,
       });
 
+      const passwordRegex = new RegExp(uiParams.passwordPattern);
+
       while (true) {
         if (!this.#pty) {
           break;
@@ -587,16 +593,24 @@ export class Ui extends BaseUi<Params> {
         if (data.length > 0) {
           // Replace ANSI escape sequence.
           // deno-lint-ignore no-control-regex
-          const ansiEscapePattern = /\x1b\[[0-9;]*m/g;
+          const ansiEscapePattern = /\x1b(\[[0-9;?]*[A-Za-z]|[=>])/g;
+          // deno-lint-ignore no-control-regex
+          const returnPattern = /\x0d/;
 
           await fn.appendbufline(
             denops,
             this.#bufNr,
             "$",
-            data.replace(ansiEscapePattern, "").split(/\r?\n/).filter((str) =>
-              str.length > 0
-            ),
+            data.replace(ansiEscapePattern, "").replace(returnPattern, "")
+              .split(/\r?\n|\r/).filter((str) => str.length > 0),
           );
+
+          if (passwordRegex.exec(data)) {
+            const secret = await fn.inputsecret(denops, "Password: ");
+            if (secret.length > 0) {
+              await this.#pty.write(secret + "\n");
+            }
+          }
 
           await this.#moveCursorLast(denops);
           this.#prompt = await fn.getline(denops, "$");

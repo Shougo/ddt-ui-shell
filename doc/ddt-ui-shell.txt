@@ -87,6 +87,12 @@ cwd		string
 
 		Default: Use |getcwd()| value
 
+                                          *ddt-ui-shell-param-passwordPattern*
+passwordPattern	string
+		Sets the pattern which matches the password prompt.
+
+		Default: See the source code.
+
                                                    *ddt-ui-shell-param-prompt*
 prompt		string
 		Sets the shell prompt.
