@@ -65,6 +65,10 @@ function ddt#ui#shell#_set_editor(nvim_server) abort
 endfunction
 
 function ddt#ui#shell#_check_prompt() abort
+  if !'b:ddt_ui_shell_prompt_pattern'->exists()
+    return
+  endif
+
   const current_line = '.'->getline()
   const check_pattern = '^' .. b:ddt_ui_shell_prompt_pattern
   if current_line !~# check_pattern
