@@ -583,11 +583,17 @@ export class Ui extends BaseUi<Params> {
         }
 
         if (data.length > 0) {
+          // Replace ANSI escape sequence.
+          // deno-lint-ignore no-control-regex
+          const ansiEscapePattern = /\x1b\[[0-9;]*m/g;
+
           await fn.appendbufline(
             denops,
             this.#bufNr,
             "$",
-            data.split(/\r?\n/).filter((str) => str.length > 0),
+            data.replace(ansiEscapePattern, "").split(/\r?\n/).filter((str) =>
+              str.length > 0
+            ),
           );
 
           await this.#moveCursorLast(denops);
