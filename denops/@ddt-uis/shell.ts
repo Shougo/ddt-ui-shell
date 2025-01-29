@@ -14,8 +14,10 @@ import * as autocmd from "jsr:@denops/std@~7.4.0/autocmd";
 
 import { join } from "jsr:@std/path@~1.0.3/join";
 import { resolve } from "jsr:@std/path@~1.0.3/resolve";
+import { relative } from "jsr:@std/path@~1.0.3/relative";
 import { isAbsolute } from "jsr:@std/path@~1.0.2/is-absolute";
 import { assertEquals } from "jsr:@std/assert@~1.0.2/equals";
+import { expandGlob } from "jsr:@std/fs@~1.0.2/expand-glob";
 import { Pty } from "jsr:@sigma/pty-ffi@~0.26.4";
 
 export type Params = {
@@ -436,7 +438,7 @@ export class Ui extends BaseUi<Params> {
     await fn.cursor(
       denops,
       await fn.line(denops, "$"),
-      0,
+      1,
     );
 
     await fn.cursor(
@@ -538,7 +540,11 @@ export class Ui extends BaseUi<Params> {
     await appendHistory(denops, uiParams, commandLine);
 
     if (!this.#pty) {
-      const [cmd, ...cmdArgs] = parseCommandLine(commandLine);
+      const [cmd, ...cmdArgs] = await parseCommandLine(
+        denops,
+        this.#cwd,
+        commandLine,
+      );
 
       // Builtin commands
       if (this.#builtins[cmd]) {
@@ -572,7 +578,7 @@ export class Ui extends BaseUi<Params> {
       this.#pty = new Pty({
         cmd,
         args: cmdArgs,
-        env: [["EDITOR", editor], ["GIT_EDITOR", editor]],
+        env: [["EDITOR", editor], ["GIT_EDITOR", editor], ["PAGER", "cat"]],
         cwd: this.#cwd,
       });
 
@@ -669,7 +675,19 @@ async function getCommandLine(
     : substitute;
 }
 
-function parseCommandLine(input: string): string[] {
+async function parseCommandLine(
+  denops: Denops,
+  cwd: string,
+  input: string,
+): Promise<string[]> {
+  let result: string[] = [];
+  for (const arg of splitArgs(input)) {
+    result = result.concat(await expandArg(denops, cwd, arg));
+  }
+  return result;
+}
+
+function splitArgs(input: string): string[] {
   // Use a regular expression to split the input string by spaces, handling
   // quotes
   const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/gi;
@@ -677,21 +695,33 @@ function parseCommandLine(input: string): string[] {
 
   let match = regex.exec(input);
   while (match) {
-    result.push(expandArg(match[1] ?? match[2] ?? match[0]));
+    result.push(match[1] ?? match[2] ?? match[0]);
     match = regex.exec(input);
   }
 
   return result;
 }
 
-function expandArg(arg: string): string {
-  const home = Deno.env.get("HOME");
-  if (home && home !== "") {
-    // Replace home directory
-    arg = arg.replace(/^~/, home);
+async function expandArg(
+  denops: Denops,
+  cwd: string,
+  arg: string,
+): Promise<string[]> {
+  //const home = Deno.env.get("HOME");
+  //if (home && home !== "") {
+  //  // Replace home directory
+  //  arg = arg.replace(/^~/, home);
+  //}
+  arg = await fn.expand(denops, arg) as string;
+
+  const glob = await Array.fromAsync(expandGlob(arg, { root: cwd }));
+  if (glob.length === 0 && arg.includes("*")) {
+    printError(denops, `No matches found: ${arg}`);
   }
 
-  return arg;
+  return glob.length === 0
+    ? [arg]
+    : glob.map((entry) => relative(cwd, entry.path));
 }
 
 async function getHistory(denops: Denops, params: Params): Promise<string[]> {
@@ -749,22 +779,22 @@ const safeStat = async (path: string): Promise<Deno.FileInfo | null> => {
   return null;
 };
 
-Deno.test("parseCommandLine should split a simple command", () => {
-  assertEquals(parseCommandLine("ls -la"), ["ls", "-la"]);
+Deno.test("splitArgs should split a simple command", () => {
+  assertEquals(splitArgs("ls -la"), ["ls", "-la"]);
 });
 
-Deno.test("parseCommandLine should handle double quotes", () => {
-  assertEquals(parseCommandLine('echo "Hello World"'), ["echo", "Hello World"]);
+Deno.test("splitArgs should handle double quotes", () => {
+  assertEquals(splitArgs('echo "Hello World"'), ["echo", "Hello World"]);
 });
 
-Deno.test("parseCommandLine should handle single quotes", () => {
-  assertEquals(parseCommandLine("echo 'Hello World'"), ["echo", "Hello World"]);
+Deno.test("splitArgs should handle single quotes", () => {
+  assertEquals(splitArgs("echo 'Hello World'"), ["echo", "Hello World"]);
 });
 
-Deno.test("parseCommandLine should handle multiple spaces", () => {
-  assertEquals(parseCommandLine("  ls    -la   "), ["ls", "-la"]);
+Deno.test("splitArgs should handle multiple spaces", () => {
+  assertEquals(splitArgs("  ls    -la   "), ["ls", "-la"]);
 });
 
-Deno.test("parseCommandLine should handle empty input", () => {
-  assertEquals(parseCommandLine(""), []);
+Deno.test("splitArgs should handle empty input", () => {
+  assertEquals(splitArgs(""), []);
 });
