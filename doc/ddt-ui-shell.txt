@@ -188,6 +188,13 @@ cd [{directory}]
 history
 		Print current history list.
 
+                                                    *ddu-ui-shell-builtin-vim*
+vim {path}
+		params:
+			{path}: File path.
+
+		Edit {path} file.
+
 ==============================================================================
 EXAMPLES                                               *ddt-ui-shell-examples*
 >vim

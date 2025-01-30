@@ -19,6 +19,7 @@ import { isAbsolute } from "jsr:@std/path@~1.0.2/is-absolute";
 import { assertEquals } from "jsr:@std/assert@~1.0.2/equals";
 import { expandGlob } from "jsr:@std/fs@~1.0.2/expand-glob";
 import { Pty } from "jsr:@sigma/pty-ffi@~0.26.4";
+//import { parse } from 'jsr:@fcrozatier/monarch@~2.3.2';
 
 export type Params = {
   cwd: string;
@@ -59,9 +60,14 @@ type BuiltinArguments<Params extends BaseParams> = {
   cmdArgs: string[];
 };
 
+export type BuiltinResult = {
+  skipPrompt?: boolean;
+  value: number;
+};
+
 export type BuiltinCallback = (
   args: BuiltinArguments<Params>,
-) => Promise<number>;
+) => Promise<BuiltinResult>;
 
 export class Ui extends BaseUi<Params> {
   #bufNr = -1;
@@ -334,7 +340,9 @@ export class Ui extends BaseUi<Params> {
             : Deno.env.get("HOME") ?? "",
         );
 
-        return 0;
+        return {
+          value: 0,
+        };
       },
     },
     history: {
@@ -351,7 +359,41 @@ export class Ui extends BaseUi<Params> {
           await fn.append(args.denops, "$", history);
         }
 
-        return 0;
+        return {
+          value: 0,
+        };
+      },
+    },
+    vim: {
+      description: "Edit the file",
+      callback: async (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiParams: Params;
+        cmdArgs: string[];
+      }) => {
+        if (args.cmdArgs.length === 0) {
+          return {
+            value: 0,
+          };
+        }
+
+        // Print prompt before edit.
+        await this.#newPrompt(args.denops, args.uiParams);
+
+        const abspath = isAbsolute(args.cmdArgs[0])
+          ? args.cmdArgs[0]
+          : resolve(join(this.#cwd, args.cmdArgs[0]));
+        await args.denops.cmd(
+          `edit ${await fn.fnameescape(args.denops, abspath)}`,
+        );
+
+        await args.denops.cmd("stopinsert");
+
+        return {
+          skipPrompt: true,
+          value: 0,
+        };
       },
     },
   };
@@ -419,6 +461,7 @@ export class Ui extends BaseUi<Params> {
     const lastLine = await fn.getline(denops, "$");
 
     if (lastLine.length === 0 || lastLine === params.prompt + " ") {
+      // Remove directory line.
       await fn.deletebufline(
         denops,
         this.#bufNr,
@@ -548,7 +591,7 @@ export class Ui extends BaseUi<Params> {
 
       // Builtin commands
       if (this.#builtins[cmd]) {
-        await this.#builtins[cmd].callback({
+        const result = await this.#builtins[cmd].callback({
           denops,
           options,
           uiOptions,
@@ -556,7 +599,10 @@ export class Ui extends BaseUi<Params> {
           cmdArgs,
         });
 
-        await this.#newPrompt(denops, uiParams);
+        const skipPrompt = result.skipPrompt ?? false;
+        if (!skipPrompt) {
+          await this.#newPrompt(denops, uiParams);
+        }
 
         return;
       }
@@ -603,12 +649,16 @@ export class Ui extends BaseUi<Params> {
           // deno-lint-ignore no-control-regex
           const returnPattern = /\x0d/;
 
+          const replacedData = data.replace(ansiEscapePattern, "").replace(
+            returnPattern,
+            "",
+          );
+
           await fn.appendbufline(
             denops,
             this.#bufNr,
             "$",
-            data.replace(ansiEscapePattern, "").replace(returnPattern, "")
-              .split(/\r?\n|\r/).filter((str) => str.length > 0),
+            replacedData.split(/\r?\n|\r/).filter((str) => str.length > 0),
           );
 
           if (passwordRegex.exec(data)) {
@@ -690,6 +740,7 @@ async function parseCommandLine(
 function splitArgs(input: string): string[] {
   // Use a regular expression to split the input string by spaces, handling
   // quotes
+  // TODO: use monarch instead.
   const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/gi;
   const result: string[] = [];
 
@@ -712,6 +763,7 @@ async function expandArg(
   //  // Replace home directory
   //  arg = arg.replace(/^~/, home);
   //}
+  // TODO: use monarch instead.
   arg = await fn.expand(denops, arg) as string;
 
   const glob = await Array.fromAsync(expandGlob(arg, { root: cwd }));
