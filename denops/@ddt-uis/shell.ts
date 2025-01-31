@@ -776,15 +776,15 @@ async function expandArg(
   cwd: string,
   arg: string,
 ): Promise<string[]> {
-  //const home = Deno.env.get("HOME");
-  //if (home && home !== "") {
-  //  // Replace home directory
-  //  arg = arg.replace(/^~/, home);
-  //}
   // TODO: use monarch instead.
-  arg = await fn.expand(denops, arg) as string;
+  const home = Deno.env.get("HOME");
+  if (home && home !== "") {
+    // Replace home directory
+    arg = arg.replace(/^~/, home);
+  }
 
   const glob = await Array.fromAsync(expandGlob(arg, { root: cwd }));
+  console.log(glob);
   if (glob.length === 0 && arg.includes("*")) {
     printError(denops, `No matches found: ${arg}`);
   }
