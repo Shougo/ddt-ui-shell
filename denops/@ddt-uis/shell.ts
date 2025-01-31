@@ -784,7 +784,6 @@ async function expandArg(
   }
 
   const glob = await Array.fromAsync(expandGlob(arg, { root: cwd }));
-  console.log(glob);
   if (glob.length === 0 && arg.includes("*")) {
     printError(denops, `No matches found: ${arg}`);
   }
