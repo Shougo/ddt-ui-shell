@@ -2,9 +2,9 @@ import type {
   BaseParams,
   DdtOptions,
   UiOptions,
-} from "jsr:@shougo/ddt-vim@~1.0.0/types";
-import { BaseUi, type UiActions } from "jsr:@shougo/ddt-vim@~1.0.0/ui";
-import { printError } from "jsr:@shougo/ddt-vim@~1.0.0/utils";
+} from "jsr:@shougo/ddt-vim@~1.1.0/types";
+import { BaseUi, type UiActions } from "jsr:@shougo/ddt-vim@~1.1.0/ui";
+import { printError, safeStat } from "jsr:@shougo/ddt-vim@~1.1.0/utils";
 
 import type { Denops } from "jsr:@denops/std@~7.4.0";
 import * as fn from "jsr:@denops/std@~7.4.0/function";
@@ -187,6 +187,24 @@ export class Ui extends BaseUi<Params> {
         );
       },
     },
+    insert: {
+      description: "Insert the string to shell",
+      callback: async (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiOptions: UiOptions;
+        uiParams: Params;
+        actionParams: BaseParams;
+      }) => {
+        const params = args.actionParams as SendParams;
+
+        if (!this.#pty) {
+          await this.#newPrompt(args.denops, args.uiParams, params.str);
+        } else {
+          await this.#pty.write(params.str);
+        }
+      },
+    },
     terminate: {
       description: "Terminate the current command",
       callback: async (args: {
@@ -276,7 +294,7 @@ export class Ui extends BaseUi<Params> {
       },
     },
     send: {
-      description: "Send the string to shell",
+      description: "Send and execute the string to shell",
       callback: async (args: {
         denops: Denops;
         options: DdtOptions;
@@ -810,26 +828,6 @@ async function appendHistory(
     throw error;
   }
 }
-
-const safeStat = async (path: string): Promise<Deno.FileInfo | null> => {
-  // NOTE: Deno.stat() may be failed
-  try {
-    const stat = await Deno.lstat(path);
-    if (stat.isSymlink) {
-      try {
-        const stat = await Deno.stat(path);
-        stat.isSymlink = true;
-        return stat;
-      } catch (_: unknown) {
-        // Ignore stat exception
-      }
-    }
-    return stat;
-  } catch (_: unknown) {
-    // Ignore stat exception
-  }
-  return null;
-};
 
 Deno.test("splitArgs should split a simple command", () => {
   assertEquals(splitArgs("ls -la"), ["ls", "-la"]);

@@ -55,6 +55,13 @@ cd
 executeLine
 		Execute the command line.
 
+                                                  *ddu-ui-shell-action-insert*
+insert
+		params:
+			{str}: Target string.
+
+		Insert {str} to the process.
+
                                                *ddu-ui-shell-action-terminate*
 terminate
 		Terminate the current command.
@@ -76,7 +83,7 @@ send
 		params:
 			{str}: Target string.
 
-		Send {str} to the process.
+		Send {str} to the process and execute.
 
 ------------------------------------------------------------------------------
 PARAMS                                                   *ddt-ui-shell-params*
