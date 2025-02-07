@@ -104,6 +104,7 @@ passwordPattern	string
 prompt		string
 		Sets the shell prompt.
 		NOTE: It cannot be changed after UI is created.
+		NOTE: It must be fixed string.
 
 		Default: "%"
 
@@ -150,6 +151,15 @@ startInsert	boolean
 		Start the insert mode.
 
 		Default: v:true
+
+                                               *ddt-ui-shell-param-userPrompt*
+userPrompt	string
+		Set the additional prompt.  It is evaluated as Vim script.
+		Note: Unlike |ddt-ui-shell-param-prompt|, it can be a non-fixed
+		string.  You can get multi-line prompt by separating "user
+		prompt" with "\n".
+
+		Default: ""
 
                                                    *ddt-ui-shell-param-winCol*
 winCol		number
@@ -215,6 +225,7 @@ EXAMPLES                                               *ddt-ui-shell-examples*
 	      \   uiParams: #{
 	      \     shell: #{
 	      \       prompt: '%',
+	      \       userPrompt: 'fnamemodify(getcwd(), ":~")',
 	      \     },
 	      \   },
 	      \ })

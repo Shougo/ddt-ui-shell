@@ -33,6 +33,7 @@ export type Params = {
   split: string;
   startInsert: boolean;
   toggle: boolean;
+  userPrompt: string;
   winCol: number;
   winHeight: number;
   winRow: number;
@@ -334,6 +335,7 @@ export class Ui extends BaseUi<Params> {
       split: "",
       startInsert: false,
       toggle: false,
+      userPrompt: "",
       winCol: 50,
       winHeight: 15,
       winRow: 20,
@@ -475,9 +477,15 @@ export class Ui extends BaseUi<Params> {
 
   async #newPrompt(denops: Denops, params: Params, commandLine: string = "") {
     this.#prompt = `${params.prompt} ${commandLine}`;
-    const promptLines = [this.#cwd, this.#prompt];
-    const lastLine = await fn.getline(denops, "$");
 
+    let promptLines: string[] = [];
+    if (params.userPrompt.length !== 0) {
+      const userPrompt = await denops.eval(params.userPrompt) as string;
+      promptLines = promptLines.concat(userPrompt.split("\n"));
+    }
+    promptLines.push(this.#prompt);
+
+    const lastLine = await fn.getline(denops, "$");
     if (lastLine.length === 0 || lastLine === params.prompt + " ") {
       // Remove directory line.
       await fn.deletebufline(
@@ -562,7 +570,10 @@ export class Ui extends BaseUi<Params> {
   }
 
   async #cd(denops: Denops, params: Params, directory: string) {
-    const stat = await safeStat(directory);
+    const abspath = isAbsolute(directory)
+      ? directory
+      : resolve(join(this.#cwd, directory));
+    const stat = await safeStat(abspath);
     if (!stat || !stat.isDirectory) {
       printError(denops, `${directory} is not directory.`);
       return;
@@ -571,9 +582,11 @@ export class Ui extends BaseUi<Params> {
     await vars.t.set(
       denops,
       "ddt_ui_last_directory",
-      directory,
+      abspath,
     );
-    this.#cwd = directory;
+    this.#cwd = abspath;
+
+    await fn.chdir(denops, this.#cwd);
 
     await this.#newPrompt(denops, params);
   }
