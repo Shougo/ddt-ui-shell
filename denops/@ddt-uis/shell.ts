@@ -486,21 +486,17 @@ export class Ui extends BaseUi<Params> {
     this.#prompt = `${params.prompt} ${commandLine}`;
 
     let promptLines: string[] = [];
-    if (params.userPrompt.length !== 0) {
-      const userPrompt = await denops.eval(params.userPrompt) as string;
-      promptLines = promptLines.concat(userPrompt.split("\n"));
-    }
+    const userPrompts = params.userPrompt.length !== 0
+      ? (await denops.eval(params.userPrompt) as string).split("\n")
+      : [];
+    promptLines = promptLines.concat(userPrompts);
     promptLines.push(this.#prompt);
 
     const lastLine = await fn.getline(denops, "$");
-    if (lastLine.length === 0 || lastLine === params.prompt + " ") {
-      // Remove directory line.
-      await fn.deletebufline(
-        denops,
-        this.#bufNr,
-        await fn.line(denops, "$") - 1,
-      );
+    if (lastLine.length === 0) {
       await fn.setline(denops, "$", promptLines);
+    } else if (lastLine === params.prompt + " ") {
+      await fn.setline(denops, "$", this.#prompt);
     } else {
       await fn.append(denops, "$", promptLines);
     }
