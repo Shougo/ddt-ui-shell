@@ -94,6 +94,13 @@ cwd		string
 
 		Default: Use |getcwd()| value
 
+                                    *ddt-ui-shell-param-noSaveHistoryCommands*
+noSaveHistoryCommands	string[]
+		It prevents the commands listed from being saved in the
+		history.
+
+		Default: []
+
                                           *ddt-ui-shell-param-passwordPattern*
 passwordPattern	string
 		Sets the pattern which matches the password prompt.

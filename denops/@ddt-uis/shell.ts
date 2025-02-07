@@ -24,6 +24,7 @@ import { Pty } from "jsr:@sigma/pty-ffi@~0.26.4";
 export type Params = {
   cwd: string;
   floatingBorder: string;
+  noSaveHistoryCommands: string[];
   passwordPattern: string;
   prompt: string;
   promptHighlight: string;
@@ -324,6 +325,7 @@ export class Ui extends BaseUi<Params> {
     return {
       cwd: "",
       floatingBorder: "",
+      noSaveHistoryCommands: [],
       passwordPattern: "(Enter |Repeat |[Oo]ld |[Nn]ew |login " +
         "|Kerberos |EncFS |CVS |UNIX | SMB |LDAP |\\[sudo\\] )" +
         "([Pp]assword|[Pp]assphrase)",
@@ -476,6 +478,11 @@ export class Ui extends BaseUi<Params> {
   }
 
   async #newPrompt(denops: Denops, params: Params, commandLine: string = "") {
+    if (this.#pty) {
+      this.#pty.close();
+      this.#pty = null;
+    }
+
     this.#prompt = `${params.prompt} ${commandLine}`;
 
     let promptLines: string[] = [];
@@ -606,19 +613,21 @@ export class Ui extends BaseUi<Params> {
     uiParams: Params,
     commandLine: string,
   ) {
-    if (commandLine.length === 0) {
-      await this.#newPrompt(denops, uiParams);
-      return;
-    }
-
-    await appendHistory(denops, uiParams, commandLine);
-
     if (!this.#pty) {
+      if (commandLine.length === 0) {
+        await this.#newPrompt(denops, uiParams);
+        return;
+      }
+
       const [cmd, ...cmdArgs] = await parseCommandLine(
         denops,
         this.#cwd,
         commandLine,
       );
+
+      if (!uiParams.noSaveHistoryCommands.includes(cmd)) {
+        await appendHistory(denops, uiParams, commandLine);
+      }
 
       // Builtin commands
       if (this.#builtins[cmd]) {
@@ -655,7 +664,13 @@ export class Ui extends BaseUi<Params> {
       this.#pty = new Pty({
         cmd,
         args: cmdArgs,
-        env: [["EDITOR", editor], ["GIT_EDITOR", editor], ["PAGER", "cat"]],
+        env: [
+          ["EDITOR", editor],
+          ["GIT_EDITOR", editor],
+          ["PAGER", "cat"],
+          ["GIT_PAGER", "cat"],
+          ["MANPAGER", "cat"],
+        ],
         cwd: this.#cwd,
       });
 
@@ -676,7 +691,7 @@ export class Ui extends BaseUi<Params> {
         if (data.length > 0) {
           // Replace ANSI escape sequence.
           // deno-lint-ignore no-control-regex
-          const ansiEscapePattern = /\x1b(\[[0-9;?]*[A-Za-z]|[=>])/g;
+          const ansiEscapePattern = /\x1b(\[[0-9;?]*[A-Za-z]|\[[0-9;?]|\(B)/g;
           // deno-lint-ignore no-control-regex
           const returnPattern = /\x0d/;
 
