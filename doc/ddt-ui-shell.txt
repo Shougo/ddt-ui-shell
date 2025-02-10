@@ -169,34 +169,34 @@ userPrompt	string
 		Default: ""
 
                                                    *ddt-ui-shell-param-winCol*
-winCol		number
+winCol		(number | string)
 		Set the column position of the window if
 		|ddt-ui-shell-param-split| is "floating".
 
-		Default: 50
+		Default: "(&columns - eval(uiParams.winWidth)) / 2"
 
                                                 *ddt-ui-shell-param-winHeight*
-winHeight	number
+winHeight	(number | string)
 		Set the height of the window if |ddt-ui-shell-param-split|
 		is "horizontal".
 
-		Default: 15
+		Default: 20
 
                                                    *ddt-ui-shell-param-winRow*
-winRow		number
+winRow		(number | string)
 		Set the row position of the window if
 		|ddt-ui-shell-param-split| is "floating".
 
-		Default: 20
+		Default: "&lines / 2 - 10"
 
                                                  *ddt-ui-shell-param-winWidth*
-winWidth	number
+winWidth	(number | string)
 		Set the width of the window if |ddt-ui-shell-param-split|
 		is "vertical".
 		If |ddt-ui-shell-param-split| is "floating", set the width
 		of the floating window.
 
-		Default: 80
+		Default: "&columns / 2"
 
 ------------------------------------------------------------------------------
 Builtin Commands                                       *ddt-ui-shell-builtins*

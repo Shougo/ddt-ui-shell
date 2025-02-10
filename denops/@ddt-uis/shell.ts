@@ -1,5 +1,6 @@
 import type {
   BaseParams,
+  Context,
   DdtOptions,
   UiOptions,
 } from "jsr:@shougo/ddt-vim@~1.1.0/types";
@@ -12,6 +13,7 @@ import * as vars from "jsr:@denops/std@~7.4.0/variable";
 import { batch } from "jsr:@denops/std@~7.4.0/batch";
 import * as autocmd from "jsr:@denops/std@~7.4.0/autocmd";
 
+import { is } from "jsr:@core/unknownutil@~4.3.0/is";
 import { join } from "jsr:@std/path@~1.0.3/join";
 import { resolve } from "jsr:@std/path@~1.0.3/resolve";
 import { relative } from "jsr:@std/path@~1.0.3/relative";
@@ -21,8 +23,11 @@ import { expandGlob } from "jsr:@std/fs@~1.0.2/expand-glob";
 import { Pty } from "jsr:@sigma/pty-ffi@~0.26.4";
 //import { parse } from 'jsr:@fcrozatier/monarch@~2.3.2';
 
+type ExprNumber = string | number;
+
 export type Params = {
   cwd: string;
+  exprParams: (keyof Params)[];
   floatingBorder: string;
   noSaveHistoryCommands: string[];
   passwordPattern: string;
@@ -35,10 +40,10 @@ export type Params = {
   startInsert: boolean;
   toggle: boolean;
   userPrompt: string;
-  winCol: number;
-  winHeight: number;
-  winRow: number;
-  winWidth: number;
+  winCol: ExprNumber;
+  winHeight: ExprNumber;
+  winRow: ExprNumber;
+  winWidth: ExprNumber;
 };
 
 type CdParams = {
@@ -79,6 +84,7 @@ export class Ui extends BaseUi<Params> {
 
   override async redraw(args: {
     denops: Denops;
+    context: Context;
     options: DdtOptions;
     uiOptions: UiOptions;
     uiParams: Params;
@@ -103,10 +109,16 @@ export class Ui extends BaseUi<Params> {
 
     this.#cwd = cwd;
 
+    const uiParams = await this.#resolveParams(
+      args.denops,
+      args.uiParams,
+      args.context,
+    );
+
     if (await fn.bufexists(args.denops, this.#bufNr)) {
-      await this.#switchBuffer(args.denops, args.uiParams, cwd);
+      await this.#switchBuffer(args.denops, uiParams, cwd);
     } else {
-      await this.#newBuffer(args.denops, args.options, args.uiParams);
+      await this.#newBuffer(args.denops, args.options, uiParams);
     }
 
     await this.#initVariables(
@@ -324,6 +336,12 @@ export class Ui extends BaseUi<Params> {
   override params(): Params {
     return {
       cwd: "",
+      exprParams: [
+        "winCol",
+        "winRow",
+        "winHeight",
+        "winWidth",
+      ],
       floatingBorder: "",
       noSaveHistoryCommands: [],
       passwordPattern: "(Enter |Repeat |[Oo]ld |[Nn]ew |login " +
@@ -338,10 +356,10 @@ export class Ui extends BaseUi<Params> {
       startInsert: false,
       toggle: false,
       userPrompt: "",
-      winCol: 50,
-      winHeight: 15,
-      winRow: 20,
-      winWidth: 80,
+      winCol: "(&columns - eval(uiParams.winWidth)) / 2",
+      winHeight: 20,
+      winRow: "&lines / 2 - 10",
+      winWidth: "&columns / 2",
     };
   }
 
@@ -572,6 +590,40 @@ export class Ui extends BaseUi<Params> {
     );
   }
 
+  async #resolveParams(
+    denops: Denops,
+    uiParams: Params,
+    context: Record<string, unknown>,
+  ): Promise<Params> {
+    const defaults = this.params();
+
+    context = {
+      uiParams,
+      ...context,
+    };
+
+    const params = Object.assign(uiParams);
+    for (const name of uiParams.exprParams) {
+      if (name in uiParams) {
+        params[name] = await evalExprParam(
+          denops,
+          name,
+          params[name],
+          defaults[name],
+          context,
+        );
+      } else {
+        await printError(
+          denops,
+          `Invalid expr param: ${name}`,
+        );
+      }
+    }
+
+    return params;
+  }
+
+
   async #cd(denops: Denops, params: Params, directory: string) {
     const abspath = isAbsolute(directory)
       ? directory
@@ -721,6 +773,33 @@ export class Ui extends BaseUi<Params> {
     } else {
       await this.#pty.write(commandLine + "\n");
     }
+  }
+}
+
+async function evalExprParam(
+  denops: Denops,
+  name: string,
+  expr: string | unknown,
+  defaultExpr: string | unknown,
+  context: Record<string, unknown>,
+): Promise<unknown> {
+  if (!is.String(expr)) {
+    return expr;
+  }
+
+  try {
+    return await denops.eval(expr, context);
+  } catch (e) {
+    await printError(
+      denops,
+      e,
+      `[ddt-ui-shell] invalid expression in option: ${name}`,
+    );
+
+    // Fallback to default param.
+    return is.String(defaultExpr)
+      ? await denops.eval(defaultExpr, context)
+      : defaultExpr;
   }
 }
 
