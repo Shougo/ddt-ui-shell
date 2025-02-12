@@ -623,7 +623,6 @@ export class Ui extends BaseUi<Params> {
     return params;
   }
 
-
   async #cd(denops: Denops, params: Params, directory: string) {
     const abspath = isAbsolute(directory)
       ? directory
