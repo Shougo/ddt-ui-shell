@@ -714,9 +714,10 @@ export class Ui extends BaseUi<Params> {
         env: [
           ["EDITOR", editor],
           ["GIT_EDITOR", editor],
-          ["PAGER", "cat"],
           ["GIT_PAGER", "cat"],
           ["MANPAGER", "cat"],
+          ["PAGER", "cat"],
+          ["TERM", "dumb"],
         ],
         cwd: this.#cwd,
       });
