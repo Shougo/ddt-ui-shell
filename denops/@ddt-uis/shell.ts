@@ -443,10 +443,14 @@ export class Ui extends BaseUi<Params> {
 
     await denops.cmd(`buffer ${this.#bufNr}`);
 
-    // Check current directory
+    const lastLine = await fn.getline(denops, "$");
     if (this.#cwd !== "" && newCwd !== this.#cwd) {
+      // Current directory is changed
       await this.#newCdPrompt(denops, params, newCwd);
       await this.#cd(denops, params, newCwd);
+    } else if (lastLine === params.prompt + " ") {
+      // Redraw the prompt
+      await this.#newPrompt(denops, params);
     }
   }
 
