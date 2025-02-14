@@ -706,19 +706,24 @@ export class Ui extends BaseUi<Params> {
         }
       }
 
-      // NOTE: EDITOR env must be set to support "git commit".
-      const editor = await fn.expand(denops, "$EDITOR") as string ?? "";
+      const environ = {
+        ...(await fn.environ(denops) as Record<string, string>),
+        GIT_EDITOR: "cat",
+        GIT_PAGER: "cat",
+        MANPAGER: "cat",
+        PAGER: "cat",
+        TERM: "dumb",
+      };
+
+      const env: [string, string][] = [];
+      for (const [key, value] of Object.entries(environ)) {
+        env.push([key, value]);
+      }
+
       this.#pty = new Pty({
         cmd,
         args: cmdArgs,
-        env: [
-          ["EDITOR", editor],
-          ["GIT_EDITOR", editor],
-          ["GIT_PAGER", "cat"],
-          ["MANPAGER", "cat"],
-          ["PAGER", "cat"],
-          ["TERM", "dumb"],
-        ],
+        env,
         cwd: this.#cwd,
       });
 
