@@ -712,7 +712,6 @@ export class Ui extends BaseUi<Params> {
 
       const environ = {
         ...(await fn.environ(denops) as Record<string, string>),
-        GIT_EDITOR: "cat",
         GIT_PAGER: "cat",
         MANPAGER: "cat",
         PAGER: "cat",
