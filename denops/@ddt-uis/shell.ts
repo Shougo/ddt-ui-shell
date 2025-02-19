@@ -730,6 +730,10 @@ export class Ui extends BaseUi<Params> {
         cwd: this.#cwd,
       });
 
+      await fn.appendbufline(denops, this.#bufNr, "$", "");
+      await this.#moveCursorLast(denops);
+      this.#prompt = await fn.getline(denops, "$");
+
       const passwordRegex = new RegExp(uiParams.passwordPattern);
 
       while (true) {
@@ -756,12 +760,23 @@ export class Ui extends BaseUi<Params> {
             "",
           );
 
-          await fn.appendbufline(
-            denops,
-            this.#bufNr,
-            "$",
-            replacedData.split(/\r?\n|\r/).filter((str) => str.length > 0),
-          );
+          const lines = replacedData.split(/\r?\n|\r/).filter((str) => str.length > 0);
+
+          if ((await fn.getline(denops, "$")).length === 0) {
+            await fn.setbufline(
+              denops,
+              this.#bufNr,
+              "$",
+              lines,
+            );
+          } else {
+            await fn.appendbufline(
+              denops,
+              this.#bufNr,
+              "$",
+              lines,
+            );
+          }
 
           if (passwordRegex.exec(data)) {
             const secret = await fn.inputsecret(denops, "Password: ");
