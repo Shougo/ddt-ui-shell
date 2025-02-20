@@ -2,6 +2,8 @@
 
 Shell UI for ddt.vim
 
+![2025-02-20_10-10](https://github.com/user-attachments/assets/08f9c02e-bddb-48de-b18b-f90516186b6b)
+
 ## Required
 
 ### denops.vim
