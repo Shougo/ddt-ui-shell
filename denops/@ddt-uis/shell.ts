@@ -760,7 +760,9 @@ export class Ui extends BaseUi<Params> {
             "",
           );
 
-          const lines = replacedData.split(/\r?\n|\r/).filter((str) => str.length > 0);
+          const lines = replacedData.split(/\r?\n|\r/).filter((str) =>
+            str.length > 0
+          );
 
           if ((await fn.getline(denops, "$")).length === 0) {
             await fn.setbufline(

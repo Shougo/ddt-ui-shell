@@ -8,7 +8,6 @@ CONTENTS                                               *ddt-ui-shell-contents*
 Introduction		|ddt-ui-shell-introduction|
 Install			|ddt-ui-shell-install|
 Interface		|ddt-ui-shell-interface|
-  Functions		  |ddt-ui-shell-functions|
   Actions		  |ddt-ui-shell-actions|
   Params		  |ddt-ui-shell-params|
   Builtin Commands	  |ddt-ui-shell-builtins|
@@ -36,10 +35,6 @@ It requires "--unstable-ffi" for |g:denops#server#deno_args|.
 
 ==============================================================================
 INTERFACE                                             *ddt-ui-shell-interface*
-
-
-------------------------------------------------------------------------------
-FUNCTIONS                                             *ddt-ui-shell-functions*
 
 ------------------------------------------------------------------------------
 ACTIONS                                                 *ddt-ui-shell-actions*
@@ -162,9 +157,9 @@ startInsert	boolean
                                                *ddt-ui-shell-param-userPrompt*
 userPrompt	string
 		Set the additional prompt.  It is evaluated as Vim script.
-		Note: Unlike |ddt-ui-shell-param-prompt|, it can be a non-fixed
-		string.  You can get multi-line prompt by separating "user
-		prompt" with "\n".
+		Note: Unlike |ddt-ui-shell-param-prompt|, it can be a
+		non-fixed string.  You can get multi-line prompt by separating
+		"user prompt" with "\n".
 
 		Default: ""
 
