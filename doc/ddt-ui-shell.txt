@@ -73,6 +73,10 @@ pastePrompt
 previousPrompt
 		Move to the previous prompt from cursor.
 
+                                                  *ddu-ui-shell-action-redraw*
+redraw
+		Redraw the UI prompt.
+
                                                     *ddu-ui-shell-action-send*
 send
 		params:

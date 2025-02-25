@@ -219,6 +219,24 @@ export class Ui extends BaseUi<Params> {
         }
       },
     },
+    redraw: {
+      description: "Redraw the UI prompt",
+      callback: async (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiParams: Params;
+      }) => {
+        if (await fn.bufnr(args.denops, "%") != this.#bufNr) {
+          return;
+        }
+
+        const lastLine = await fn.getline(args.denops, "$");
+        if (lastLine === args.uiParams.prompt + " ") {
+          // Redraw the prompt
+          await this.#newPrompt(args.denops, args.uiParams);
+        }
+      },
+    },
     terminate: {
       description: "Terminate the current command",
       callback: async (args: {
@@ -226,9 +244,7 @@ export class Ui extends BaseUi<Params> {
         options: DdtOptions;
         uiParams: Params;
       }) => {
-        if (
-          await fn.bufnr(args.denops, "%") != this.#bufNr
-        ) {
+        if (await fn.bufnr(args.denops, "%") != this.#bufNr) {
           return;
         }
 
