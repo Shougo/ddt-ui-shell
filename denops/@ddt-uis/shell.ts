@@ -797,6 +797,9 @@ export class Ui extends BaseUi<Params> {
           }
 
           if (passwordRegex.exec(data)) {
+            // NOTE: Move the cursor to make the output more visible.
+            await denops.cmd("normal! zz");
+
             const secret = await fn.inputsecret(denops, "Password: ");
             if (secret.length > 0) {
               await this.#pty.write(secret + "\n");
