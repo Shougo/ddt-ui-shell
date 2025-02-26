@@ -496,18 +496,6 @@ export class Ui extends BaseUi<Params> {
       await denops.cmd("startinsert");
     }
 
-    await fn.matchadd(
-      denops,
-      params.promptHighlight,
-      "^" + params.promptPattern,
-    );
-
-    await fn.matchadd(
-      denops,
-      params.userPromptHighlight,
-      "^" + params.userPromptPattern,
-    );
-
     await this.#initOptions(denops);
 
     await autocmd.group(
@@ -567,6 +555,41 @@ export class Ui extends BaseUi<Params> {
     }
 
     await fn.setbufvar(denops, this.#bufNr, "&modified", false);
+
+    // Highlight prompts
+    const promises = [];
+    const promptLineNr = await fn.line(denops, "$")
+    let userPromptLine = promptLineNr - 1;
+    for (const _userPrompt of userPrompts) {
+      promises.push(
+        denops.call(
+          "ddt#ui#shell#_highlight",
+          params.userPromptHighlight,
+          "userPrompt",
+          1,
+          this.#bufNr,
+          userPromptLine,
+          1,
+          0
+        )
+      );
+
+      userPromptLine -= 1;
+    }
+    promises.push(
+      denops.call(
+        "ddt#ui#shell#_highlight",
+        params.promptHighlight,
+        "prompt",
+        1,
+        this.#bufNr,
+        promptLineNr,
+        1,
+        params.prompt.length,
+      )
+    );
+
+    await Promise.all(promises);
 
     await this.#moveCursorLast(denops);
   }

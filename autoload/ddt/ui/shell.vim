@@ -1,3 +1,5 @@
+let s:namespace = has('nvim') ? nvim_create_namespace('ddu-ui-ff') : 0
+
 function ddt#ui#shell#_split(params) abort
   if a:params.split ==# ''
     return
@@ -79,5 +81,52 @@ function ddt#ui#shell#_check_prompt() abort
   const match_end = current_line->matchend(check_pattern)
   if '.'->col() <= match_end
     call cursor(0, match_end + 1)
+  endif
+endfunction
+
+function ddt#ui#shell#_highlight(
+      \ highlight, prop_type, priority, bufnr, row, col, length) abort
+
+  if !a:highlight->hlexists()
+    call ddt#util#print_error(
+          \ printf('highlight "%s" does not exist', a:highlight))
+    return
+  endif
+
+  if !has('nvim')
+    " Add prop_type
+    if a:prop_type->prop_type_get(#{ bufnr: a:bufnr })->empty()
+      call prop_type_add(a:prop_type, #{
+            \   bufnr: a:bufnr,
+            \   highlight: a:highlight,
+            \   priority: a:priority,
+            \   override: v:true,
+            \ })
+    endif
+  endif
+
+  const length =
+        \   a:length ==# 0
+        \ ? getbufoneline(a:bufnr, a:row)->len() - a:col + 1
+        \ : a:length
+
+  if has('nvim')
+    call nvim_buf_set_extmark(
+          \   a:bufnr,
+          \   s:namespace,
+          \   a:row - 1,
+          \   a:col - 1,
+          \   #{
+          \     end_col: a:col - 1 + length,
+          \     hl_group: a:highlight,
+          \   }
+          \ )
+  else
+    call prop_add(a:row, a:col, #{
+          \   length: length,
+          \   type: a:prop_type,
+          \   bufnr: a:bufnr,
+          \   id: s:namespace,
+          \ })
   endif
 endfunction
