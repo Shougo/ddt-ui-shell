@@ -40,6 +40,8 @@ export type Params = {
   startInsert: boolean;
   toggle: boolean;
   userPrompt: string;
+  userPromptHighlight: string;
+  userPromptPattern: string;
   winCol: ExprNumber;
   winHeight: ExprNumber;
   winRow: ExprNumber;
@@ -219,43 +221,6 @@ export class Ui extends BaseUi<Params> {
         }
       },
     },
-    redraw: {
-      description: "Redraw the UI prompt",
-      callback: async (args: {
-        denops: Denops;
-        options: DdtOptions;
-        uiParams: Params;
-      }) => {
-        if (await fn.bufnr(args.denops, "%") != this.#bufNr) {
-          return;
-        }
-
-        const lastLine = await fn.getline(args.denops, "$");
-        if (lastLine === args.uiParams.prompt + " ") {
-          // Redraw the prompt
-          await this.#newPrompt(args.denops, args.uiParams);
-        }
-      },
-    },
-    terminate: {
-      description: "Terminate the current command",
-      callback: async (args: {
-        denops: Denops;
-        options: DdtOptions;
-        uiParams: Params;
-      }) => {
-        if (await fn.bufnr(args.denops, "%") != this.#bufNr) {
-          return;
-        }
-
-        if (this.#pty) {
-          this.#pty.close();
-          this.#pty = null;
-        } else {
-          await this.#newPrompt(args.denops, args.uiParams);
-        }
-      },
-    },
     nextPrompt: {
       description: "Move to the next prompt from cursor",
       callback: async (args: {
@@ -323,6 +288,24 @@ export class Ui extends BaseUi<Params> {
         );
       },
     },
+    redraw: {
+      description: "Redraw the UI prompt",
+      callback: async (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiParams: Params;
+      }) => {
+        if (await fn.bufnr(args.denops, "%") != this.#bufNr) {
+          return;
+        }
+
+        const lastLine = await fn.getline(args.denops, "$");
+        if (lastLine === args.uiParams.prompt + " ") {
+          // Redraw the prompt
+          await this.#newPrompt(args.denops, args.uiParams);
+        }
+      },
+    },
     send: {
       description: "Send and execute the string to shell",
       callback: async (args: {
@@ -347,6 +330,25 @@ export class Ui extends BaseUi<Params> {
         );
       },
     },
+    terminate: {
+      description: "Terminate the current command",
+      callback: async (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiParams: Params;
+      }) => {
+        if (await fn.bufnr(args.denops, "%") != this.#bufNr) {
+          return;
+        }
+
+        if (this.#pty) {
+          this.#pty.close();
+          this.#pty = null;
+        } else {
+          await this.#newPrompt(args.denops, args.uiParams);
+        }
+      },
+    },
   };
 
   override params(): Params {
@@ -365,13 +367,15 @@ export class Ui extends BaseUi<Params> {
         "([Pp]assword|[Pp]assphrase)",
       prompt: "%",
       promptHighlight: "Identifier",
-      promptPattern: "",
+      promptPattern: "% ",
       shellHistoryMax: 500,
       shellHistoryPath: "",
       split: "",
       startInsert: false,
       toggle: false,
       userPrompt: "",
+      userPromptHighlight: "Special",
+      userPromptPattern: "| .*",
       winCol: "(&columns - eval(uiParams.winWidth)) / 2",
       winHeight: 20,
       winRow: "&lines / 2 - 10",
@@ -498,6 +502,12 @@ export class Ui extends BaseUi<Params> {
       "^" + params.promptPattern,
     );
 
+    await fn.matchadd(
+      denops,
+      params.userPromptHighlight,
+      "^" + params.userPromptPattern,
+    );
+
     await this.#initOptions(denops);
 
     await autocmd.group(
@@ -531,10 +541,27 @@ export class Ui extends BaseUi<Params> {
     promptLines.push(this.#prompt);
 
     const lastLine = await fn.getline(denops, "$");
-    if (lastLine.length === 0) {
+    if (lastLine === params.prompt + " ") {
+      const userPromptPos = await searchUserPrompt(
+        denops,
+        params.userPromptPattern,
+        await fn.line(denops, "$") - 1,
+      );
+
+      if (userPromptPos > 0) {
+        // Remove previous userPrompt
+        await fn.deletebufline(
+          denops,
+          this.#bufNr,
+          userPromptPos + 1,
+          "$",
+        );
+      }
+    }
+
+    if (lastLine.length === 0 || lastLine === params.prompt + " ") {
+      // Overwrite current prompt
       await fn.setline(denops, "$", promptLines);
-    } else if (lastLine === params.prompt + " ") {
-      await fn.setline(denops, "$", this.#prompt);
     } else {
       await fn.append(denops, "$", promptLines);
     }
@@ -869,6 +896,29 @@ async function searchPrompt(
     pos[0],
     col,
   );
+}
+
+async function searchUserPrompt(
+  denops: Denops,
+  promptPattern: string,
+  start: number,
+): Promise<number> {
+  const userPromptPattern = `^${promptPattern}`;
+
+  let result = -1;
+  let check = start;
+  while (check > 0) {
+    const checkLine = await fn.getline(denops, check);
+
+    if (await fn.match(denops, checkLine, userPromptPattern) < 0) {
+      break;
+    }
+
+    result = check;
+    check -= 1;
+  }
+
+  return result;
 }
 
 async function getCommandLine(
