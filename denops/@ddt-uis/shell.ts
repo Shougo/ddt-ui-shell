@@ -558,7 +558,7 @@ export class Ui extends BaseUi<Params> {
 
     // Highlight prompts
     const promises = [];
-    const promptLineNr = await fn.line(denops, "$")
+    const promptLineNr = await fn.line(denops, "$");
     let userPromptLine = promptLineNr - 1;
     for (const _userPrompt of userPrompts) {
       promises.push(
@@ -570,8 +570,8 @@ export class Ui extends BaseUi<Params> {
           this.#bufNr,
           userPromptLine,
           1,
-          0
-        )
+          0,
+        ),
       );
 
       userPromptLine -= 1;
@@ -586,7 +586,7 @@ export class Ui extends BaseUi<Params> {
         promptLineNr,
         1,
         params.prompt.length,
-      )
+      ),
     );
 
     await Promise.all(promises);

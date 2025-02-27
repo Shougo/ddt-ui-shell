@@ -174,7 +174,7 @@ userPromptHighlight	string
 
 		Default: "Special"
 
-                                            *ddt-ui-shell-param-promptPattern*
+                                        *ddt-ui-shell-param-userPromptPattern*
 userPromptPattern	string
 		Sets the pattern which matches the user prompt.
 		NOTE: It must be Vim script regex.
