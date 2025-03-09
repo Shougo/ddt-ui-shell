@@ -822,12 +822,21 @@ export class Ui extends BaseUi<Params> {
           const lines = data.replace(ansiEscapePattern, "").split(/\r?\n|\r/)
             .filter((str) => str.length > 0);
 
-          await fn.setbufline(
-            denops,
-            this.#bufNr,
-            "$",
-            lines,
-          );
+          if ((await fn.getline(denops, "$")).length === 0) {
+            await fn.setbufline(
+              denops,
+              this.#bufNr,
+              "$",
+              lines,
+            );
+          } else {
+            await fn.appendbufline(
+              denops,
+              this.#bufNr,
+              "$",
+              lines,
+            );
+          }
 
           if (passwordRegex.exec(data)) {
             // NOTE: Move the cursor to make the output more visible.
