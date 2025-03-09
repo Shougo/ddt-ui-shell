@@ -547,12 +547,7 @@ export class Ui extends BaseUi<Params> {
       }
     }
 
-    if (lastLine.length === 0 || lastLine === params.prompt + " ") {
-      // Overwrite current prompt
-      await fn.setline(denops, "$", promptLines);
-    } else {
-      await fn.append(denops, "$", promptLines);
-    }
+    await fn.setline(denops, "$", promptLines);
 
     await fn.setbufvar(denops, this.#bufNr, "&modified", false);
 
