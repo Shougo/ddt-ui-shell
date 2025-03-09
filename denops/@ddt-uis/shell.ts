@@ -818,33 +818,16 @@ export class Ui extends BaseUi<Params> {
           // Replace ANSI escape sequence.
           // deno-lint-ignore no-control-regex
           const ansiEscapePattern = /\x1b(\[[0-9;?]*[A-Za-z]|\[[0-9;?]|\(B)/g;
-          // deno-lint-ignore no-control-regex
-          const returnPattern = /\x0d/;
 
-          const replacedData = data.replace(ansiEscapePattern, "").replace(
-            returnPattern,
-            "",
+          const lines = data.replace(ansiEscapePattern, "").split(/\r?\n|\r/)
+            .filter((str) => str.length > 0);
+
+          await fn.setbufline(
+            denops,
+            this.#bufNr,
+            "$",
+            lines,
           );
-
-          const lines = replacedData.split(/\r?\n|\r/).filter((str) =>
-            str.length > 0
-          );
-
-          if ((await fn.getline(denops, "$")).length === 0) {
-            await fn.setbufline(
-              denops,
-              this.#bufNr,
-              "$",
-              lines,
-            );
-          } else {
-            await fn.appendbufline(
-              denops,
-              this.#bufNr,
-              "$",
-              lines,
-            );
-          }
 
           if (passwordRegex.exec(data)) {
             // NOTE: Move the cursor to make the output more visible.
