@@ -652,6 +652,7 @@ export class Ui extends BaseUi<Params> {
 
     await vars.t.set(denops, "ddt_ui_last_bufnr", this.#bufNr);
     await vars.t.set(denops, "ddt_ui_last_directory", cwd);
+    await vars.t.set(denops, "ddt_ui_shell_last_name", name);
 
     await vars.g.set(
       denops,
