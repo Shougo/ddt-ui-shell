@@ -7,11 +7,11 @@ import type {
 import { BaseUi, type UiActions } from "jsr:@shougo/ddt-vim@~1.1.0/ui";
 import { printError, safeStat } from "jsr:@shougo/ddt-vim@~1.1.0/utils";
 
-import type { Denops } from "jsr:@denops/std@~7.4.0";
-import * as fn from "jsr:@denops/std@~7.4.0/function";
-import * as vars from "jsr:@denops/std@~7.4.0/variable";
-import { batch } from "jsr:@denops/std@~7.4.0/batch";
-import * as autocmd from "jsr:@denops/std@~7.4.0/autocmd";
+import type { Denops } from "jsr:@denops/std@~7.5.0";
+import * as fn from "jsr:@denops/std@~7.5.0/function";
+import * as vars from "jsr:@denops/std@~7.5.0/variable";
+import { batch } from "jsr:@denops/std@~7.5.0/batch";
+import * as autocmd from "jsr:@denops/std@~7.5.0/autocmd";
 
 import { is } from "jsr:@core/unknownutil@~4.3.0/is";
 import { join } from "jsr:@std/path@~1.0.3/join";
@@ -20,7 +20,7 @@ import { relative } from "jsr:@std/path@~1.0.3/relative";
 import { isAbsolute } from "jsr:@std/path@~1.0.2/is-absolute";
 import { assertEquals } from "jsr:@std/assert@~1.0.2/equals";
 import { expandGlob } from "jsr:@std/fs@~1.0.2/expand-glob";
-import { Pty } from "jsr:@sigma/pty-ffi@~0.26.4";
+import { Pty } from "jsr:@sigma/pty-ffi@~0.27.0";
 //import { parse } from 'jsr:@fcrozatier/monarch@~2.3.2';
 
 type ExprNumber = string | number;
