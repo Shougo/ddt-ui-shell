@@ -10,6 +10,7 @@ Install			|ddt-ui-shell-install|
 Interface		|ddt-ui-shell-interface|
   Actions		  |ddt-ui-shell-actions|
   Params		  |ddt-ui-shell-params|
+  Variables		  |ddt-ui-shell-variables|
   Builtin Commands	  |ddt-ui-shell-builtins|
 Examples		|ddt-ui-shell-examples|
 FAQ			|ddt-ui-shell-faq|
@@ -210,6 +211,14 @@ winWidth	(number | string)
 		of the floating window.
 
 		Default: "&columns / 2"
+
+------------------------------------------------------------------------------
+VARIABLES                                             *ddt-ui-shell-variables*
+
+                              *ddt-ui-shell-variable-t:ddt_ui_shell_last_name*
+t:ddt_ui_shell_last_name (string)
+		The last UI |ddt-option-name| in current tab.
+
 
 ------------------------------------------------------------------------------
 Builtin Commands                                       *ddt-ui-shell-builtins*
