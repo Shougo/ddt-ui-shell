@@ -10,6 +10,7 @@ import { printError, safeStat } from "jsr:@shougo/ddt-vim@~1.1.0/utils";
 import type { Denops } from "jsr:@denops/std@~7.5.0";
 import * as fn from "jsr:@denops/std@~7.5.0/function";
 import * as vars from "jsr:@denops/std@~7.5.0/variable";
+import * as op from "jsr:@denops/std@~7.5.0/option";
 import { batch } from "jsr:@denops/std@~7.5.0/batch";
 import * as autocmd from "jsr:@denops/std@~7.5.0/autocmd";
 
@@ -487,10 +488,20 @@ export class Ui extends BaseUi<Params> {
 
     await denops.call("ddt#ui#shell#_split", params);
 
+    const prevBufnr = await fn.bufnr(denops);
+    const removeCurrentBuffer = params.split.length === 0 &&
+      (await fn.bufname(denops)).length === 0 &&
+      !await op.modified.getLocal(denops);
+
     const bufferName = `ddt-shell-${options.name}`;
     this.#bufNr = await fn.bufadd(denops, bufferName);
 
     await denops.cmd(`buffer ${this.#bufNr}`);
+
+    // Remove current buffer when empty buffer.
+    if (removeCurrentBuffer) {
+      await denops.cmd(`bwipeout ${prevBufnr}`);
+    }
 
     if (params.startInsert) {
       await denops.cmd("startinsert");
