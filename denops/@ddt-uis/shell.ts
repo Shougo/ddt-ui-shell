@@ -834,20 +834,32 @@ export class Ui extends BaseUi<Params> {
           const lines = data.replace(ansiEscapePattern, "").split(/\r?\n|\r/)
             .filter((str) => str.length > 0);
 
-          if ((await fn.getline(denops, "$")).length === 0) {
-            await fn.setbufline(
-              denops,
-              this.#bufNr,
-              "$",
-              lines,
-            );
-          } else {
-            await fn.appendbufline(
-              denops,
-              this.#bufNr,
-              "$",
-              lines,
-            );
+          for (const line of lines) {
+            const lastLine = await fn.getline(denops, "$");
+            const midIndex = Math.floor(lastLine.length / 2);
+            const headLastLine = lastLine.slice(0, midIndex);
+            const tailLastLine = lastLine.slice(midIndex);
+
+            if (
+              lastLine.length === 0 ||
+              (lastLine.length > 15 && line.startsWith(headLastLine)) ||
+              (lastLine.length > 15 && line.endsWith(tailLastLine))
+            ) {
+              // Overwrite current line
+              await fn.setbufline(
+                denops,
+                this.#bufNr,
+                "$",
+                line,
+              );
+            } else {
+              await fn.appendbufline(
+                denops,
+                this.#bufNr,
+                "$",
+                line,
+              );
+            }
           }
 
           if (passwordRegex.exec(data)) {
