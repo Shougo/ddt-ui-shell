@@ -218,7 +218,7 @@ export class Ui extends BaseUi<Params> {
         if (!this.#pty) {
           await this.#newPrompt(args.denops, args.uiParams, params.str);
         } else {
-          await this.#pty.write(params.str);
+          this.#pty.write(params.str);
         }
       },
     },
@@ -819,7 +819,7 @@ export class Ui extends BaseUi<Params> {
           break;
         }
 
-        const { data, done } = await this.#pty.read();
+        const { data, done } = this.#pty.read();
         if (done) {
           this.#pty.close();
           this.#pty = null;
@@ -856,7 +856,7 @@ export class Ui extends BaseUi<Params> {
 
             const secret = await fn.inputsecret(denops, "Password: ");
             if (secret.length > 0) {
-              await this.#pty.write(secret + "\n");
+              this.#pty.write(secret + "\n");
             }
           }
 
@@ -869,7 +869,7 @@ export class Ui extends BaseUi<Params> {
 
       await this.#newPrompt(denops, uiParams);
     } else {
-      await this.#pty.write(commandLine + "\n");
+      this.#pty.write(commandLine + "\n");
     }
   }
 }
