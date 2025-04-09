@@ -835,15 +835,19 @@ export class Ui extends BaseUi<Params> {
             .filter((str) => str.length > 0);
 
           for (const line of lines) {
-            const lastLine = await fn.getline(denops, "$");
-            const midIndex = Math.floor(lastLine.length / 2);
-            const headLastLine = lastLine.slice(0, midIndex);
-            const tailLastLine = lastLine.slice(midIndex);
+            const lastLine = (await fn.getline(denops, "$")).replaceAll(
+              /\d+/g,
+              "0",
+            );
+            const compareLine = line.replaceAll(/\d+/g, "0");
+            const index = Math.floor(compareLine.length / 3);
+            const head = lastLine.slice(0, index);
+            const tail = lastLine.slice(-index);
 
             if (
               lastLine.length === 0 ||
-              (lastLine.length > 15 && line.startsWith(headLastLine)) ||
-              (lastLine.length > 15 && line.endsWith(tailLastLine))
+              (compareLine.length > 15 && compareLine.startsWith(head)) ||
+              (compareLine.length > 15 && compareLine.endsWith(tail))
             ) {
               // Overwrite current line
               await fn.setbufline(
