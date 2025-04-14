@@ -500,7 +500,7 @@ export class Ui extends BaseUi<Params> {
 
     // Remove current buffer when empty buffer.
     if (removeCurrentBuffer) {
-      await denops.cmd(`bwipeout ${prevBufnr}`);
+      await denops.cmd(`bwipeout! ${prevBufnr}`);
     }
 
     if (params.startInsert) {
