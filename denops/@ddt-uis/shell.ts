@@ -81,6 +81,7 @@ export type BuiltinCallback = (
 
 export class Ui extends BaseUi<Params> {
   #bufNr = -1;
+  #oldCwd = "";
   #cwd = "";
   #prompt = "";
   #pty: Pty | null = null;
@@ -706,7 +707,11 @@ export class Ui extends BaseUi<Params> {
   }
 
   async #cd(denops: Denops, params: Params, directory: string) {
-    const abspath = isAbsolute(directory)
+    const abspath = directory.length === 0
+      ? Deno.env.get("HOME") ?? ""
+      : directory === "-"
+      ? this.#oldCwd
+      : isAbsolute(directory)
       ? directory
       : resolve(join(this.#cwd, directory));
     const stat = await safeStat(abspath);
@@ -714,6 +719,8 @@ export class Ui extends BaseUi<Params> {
       printError(denops, `${directory} is not directory.`);
       return;
     }
+
+    this.#oldCwd = this.#cwd;
 
     await vars.t.set(
       denops,
