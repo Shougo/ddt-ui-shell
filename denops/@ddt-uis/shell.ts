@@ -784,15 +784,23 @@ export class Ui extends BaseUi<Params> {
       }
 
       // cmd is Directory?
-      const isAbs = isAbsolute(cmd);
-      if (isAbs || cmd.startsWith("./") || cmd.startsWith("..")) {
-        const dirPath = isAbs ? cmd : resolve(join(this.#cwd, cmd));
-        const stat = await safeStat(dirPath);
-        if (stat && stat.isDirectory) {
-          // auto_cd
-          await this.#cd(denops, uiParams, dirPath);
-          return;
+      const expandedCmd = await expandDirectory(denops, this.#cwd, cmd);
+      if (expandedCmd) {
+        await this.#cd(denops, uiParams, expandedCmd);
+        return;
+      }
+
+      if (cmd.length === 0) {
+        // Check <cfile> is directory.
+        const expandedCfile = await expandDirectory(
+          denops,
+          this.#cwd,
+          await fn.expand(denops, "<cfile>") as string,
+        );
+        if (expandedCfile) {
+          await this.#cd(denops, uiParams, expandedCfile);
         }
+        return;
       }
 
       const environ = {
@@ -1023,11 +1031,17 @@ async function expandArg(
   cwd: string,
   arg: string,
 ): Promise<string[]> {
-  // TODO: use monarch instead.
-  const home = Deno.env.get("HOME");
-  if (home && home !== "") {
-    // Replace home directory
-    arg = arg.replace(/^~/, home);
+  if (arg.startsWith(".")) {
+    return [arg];
+  }
+
+  if (arg.startsWith("~")) {
+    // TODO: use monarch instead.
+    const home = Deno.env.get("HOME");
+    if (home && home !== "") {
+      // Replace home directory
+      return [arg.replace(/^~/, home)];
+    }
   }
 
   const glob = await Array.fromAsync(expandGlob(arg, { root: cwd }));
@@ -1073,6 +1087,24 @@ async function appendHistory(
     printError(denops, "Error reading history file:", error);
     throw error;
   }
+}
+
+async function expandDirectory(
+  denops: Denops,
+  cwd: string,
+  path: string,
+): Promise<string | null> {
+  const expandedPath = await fn.expand(denops, path) as string;
+  const isAbs = isAbsolute(expandedPath);
+  if (isAbs || path.startsWith("./") || path.startsWith("..")) {
+    const dirPath = isAbs ? expandedPath : resolve(join(cwd, path));
+    const stat = await safeStat(dirPath);
+    if (stat && stat.isDirectory) {
+      return dirPath;
+    }
+  }
+
+  return null;
 }
 
 Deno.test("splitArgs should split a simple command", () => {
