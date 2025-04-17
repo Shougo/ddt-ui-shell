@@ -190,11 +190,31 @@ export class Ui extends BaseUi<Params> {
           return;
         }
 
-        const commandLine = await getCommandLine(
+        let commandLine = await getCommandLine(
           args.denops,
           args.uiParams.promptPattern,
           this.#prompt,
         );
+
+        if (commandLine.length === 0) {
+          // Check <cfile> is directory.
+          const expandedCfile = await expandDirectory(
+            args.denops,
+            this.#cwd,
+            await fn.expand(args.denops, "<cfile>") as string,
+          );
+
+          if (expandedCfile) {
+            commandLine = expandedCfile;
+          }
+        }
+
+        if (
+          await fn.line(args.denops, ".") !== await fn.line(args.denops, "$")
+        ) {
+          // History execution.
+          await this.#newPrompt(args.denops, args.uiParams, commandLine);
+        }
 
         await this.#execute(
           args.denops,
@@ -751,7 +771,6 @@ export class Ui extends BaseUi<Params> {
   ) {
     if (!this.#pty) {
       if (commandLine.length === 0) {
-        await this.#newPrompt(denops, uiParams);
         return;
       }
 
@@ -784,22 +803,9 @@ export class Ui extends BaseUi<Params> {
       }
 
       // cmd is Directory?
-      const expandedCmd = await expandDirectory(denops, this.#cwd, cmd);
+      const expandedCmd = await expandDirectory(denops, this.#cwd, commandLine);
       if (expandedCmd) {
         await this.#cd(denops, uiParams, expandedCmd);
-        return;
-      }
-
-      if (cmd.length === 0) {
-        // Check <cfile> is directory.
-        const expandedCfile = await expandDirectory(
-          denops,
-          this.#cwd,
-          await fn.expand(denops, "<cfile>") as string,
-        );
-        if (expandedCfile) {
-          await this.#cd(denops, uiParams, expandedCfile);
-        }
         return;
       }
 
@@ -986,6 +992,10 @@ async function getCommandLine(
   lineNr: string | number = ".",
 ) {
   const currentLine = await fn.getline(denops, lineNr);
+  if (!currentLine.match(promptPattern)) {
+    return "";
+  }
+
   const substitute = await fn.substitute(
     denops,
     currentLine,
@@ -1051,7 +1061,9 @@ async function expandArg(
 
   return glob.length === 0
     ? [arg]
-    : glob.map((entry) => relative(cwd, entry.path));
+    : glob.map((entry) =>
+      cwd === entry.path ? entry.path : relative(cwd, entry.path)
+    );
 }
 
 async function getHistory(denops: Denops, params: Params): Promise<string[]> {
@@ -1096,7 +1108,10 @@ async function expandDirectory(
 ): Promise<string | null> {
   const expandedPath = await fn.expand(denops, path) as string;
   const isAbs = isAbsolute(expandedPath);
-  if (isAbs || path.startsWith("./") || path.startsWith("..")) {
+  if (
+    isAbs || path.startsWith("./") || path.startsWith("..") ||
+    path.endsWith("/")
+  ) {
     const dirPath = isAbs ? expandedPath : resolve(join(cwd, path));
     const stat = await safeStat(dirPath);
     if (stat && stat.isDirectory) {
