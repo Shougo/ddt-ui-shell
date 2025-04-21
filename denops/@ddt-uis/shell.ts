@@ -992,7 +992,10 @@ async function getCommandLine(
   lineNr: string | number = ".",
 ) {
   const currentLine = await fn.getline(denops, lineNr);
-  if (!currentLine.match(promptPattern)) {
+  if (
+    !currentLine.match(promptPattern) &&
+    await fn.line(denops, ".") !== await fn.line(denops, "$")
+  ) {
     return "";
   }
 
