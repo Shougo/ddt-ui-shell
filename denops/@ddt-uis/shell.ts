@@ -775,7 +775,6 @@ export class Ui extends BaseUi<Params> {
       }
 
       const [cmd, ...cmdArgs] = await parseCommandLine(
-        denops,
         this.#cwd,
         commandLine,
       );
@@ -1012,13 +1011,12 @@ async function getCommandLine(
 }
 
 async function parseCommandLine(
-  denops: Denops,
   cwd: string,
   input: string,
 ): Promise<string[]> {
   let result: string[] = [];
   for (const arg of splitArgs(input)) {
-    result = result.concat(await expandArg(denops, cwd, arg));
+    result = result.concat(await expandArg(cwd, arg));
   }
   return result;
 }
@@ -1040,33 +1038,32 @@ function splitArgs(input: string): string[] {
 }
 
 async function expandArg(
-  denops: Denops,
   cwd: string,
   arg: string,
 ): Promise<string[]> {
-  if (arg.startsWith(".")) {
-    return [arg];
-  }
+  let expanded = "";
 
-  if (arg.startsWith("~")) {
-    // TODO: use monarch instead.
-    const home = Deno.env.get("HOME");
-    if (home && home !== "") {
+  for (const c of arg) {
+    if (expanded.length === 0 && c === "~") {
       // Replace home directory
-      return [arg.replace(/^~/, home)];
+      expanded += Deno.env.get("HOME");
+    } else {
+      expanded += c;
     }
   }
 
-  const glob = await Array.fromAsync(expandGlob(arg, { root: cwd }));
-  if (glob.length === 0 && arg.includes("*")) {
-    printError(denops, `No matches found: ${arg}`);
+  if (
+    expanded.includes("*") || expanded.includes("?") || expanded.includes("[")
+  ) {
+    const glob = await Array.fromAsync(expandGlob(expanded, { root: cwd }));
+    if (glob.length > 0) {
+      return glob.map((entry) =>
+        cwd === entry.path ? entry.path : relative(cwd, entry.path)
+      );
+    }
   }
 
-  return glob.length === 0
-    ? [arg]
-    : glob.map((entry) =>
-      cwd === entry.path ? entry.path : relative(cwd, entry.path)
-    );
+  return [expanded];
 }
 
 async function getHistory(denops: Denops, params: Params): Promise<string[]> {
