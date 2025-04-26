@@ -21,7 +21,7 @@ import { relative } from "jsr:@std/path@~1.0.3/relative";
 import { isAbsolute } from "jsr:@std/path@~1.0.2/is-absolute";
 import { assertEquals } from "jsr:@std/assert@~1.0.2/equals";
 import { expandGlob } from "jsr:@std/fs@~1.0.2/expand-glob";
-import { Pty } from "jsr:@sigma/pty-ffi@~0.32.0";
+import { Pty } from "jsr:@sigma/pty-ffi@~0.36.0";
 //import { parse } from 'jsr:@fcrozatier/monarch@~2.3.2';
 
 type ExprNumber = string | number;
@@ -808,7 +808,7 @@ export class Ui extends BaseUi<Params> {
         return;
       }
 
-      const environ = {
+      const env = {
         ...(await fn.environ(denops) as Record<string, string>),
         GIT_PAGER: "cat",
         MANPAGER: "cat",
@@ -816,13 +816,7 @@ export class Ui extends BaseUi<Params> {
         TERM: "dumb",
       };
 
-      const env: [string, string][] = [];
-      for (const [key, value] of Object.entries(environ)) {
-        env.push([key, value]);
-      }
-
-      this.#pty = new Pty({
-        cmd,
+      this.#pty = new Pty(cmd, {
         args: cmdArgs,
         env,
         cwd: this.#cwd,
