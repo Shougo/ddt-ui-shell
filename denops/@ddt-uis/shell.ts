@@ -21,7 +21,7 @@ import { relative } from "jsr:@std/path@~1.0.3/relative";
 import { isAbsolute } from "jsr:@std/path@~1.0.2/is-absolute";
 import { assertEquals } from "jsr:@std/assert@~1.0.2/equals";
 import { expandGlob } from "jsr:@std/fs@~1.0.2/expand-glob";
-import { Pty } from "jsr:@sigma/pty-ffi@~0.36.0";
+import { Pty } from "jsr:@sigma/pty-ffi@~0.32.0";
 //import { parse } from 'jsr:@fcrozatier/monarch@~2.3.2';
 
 type ExprNumber = string | number;
