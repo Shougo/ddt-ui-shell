@@ -828,74 +828,64 @@ export class Ui extends BaseUi<Params> {
 
       const passwordRegex = new RegExp(uiParams.passwordPattern);
 
-      while (true) {
-        if (!this.#pty) {
-          break;
-        }
+      for await (const data of this.#pty.readable) {
+        // Replace ANSI escape sequence.
+        // deno-lint-ignore no-control-regex
+        const ansiEscapePattern = /\x1b(\[[0-9;?]*[A-Za-z]|\[[0-9;?]|\(B)/g;
 
-        const { data, done } = this.#pty.read();
-        if (done) {
-          this.#pty.close();
-          this.#pty = null;
-          break;
-        }
+        const lines = data.replace(ansiEscapePattern, "").split(/\r?\n|\r/)
+          .filter((str) => str.length > 0);
 
-        if (data.length > 0) {
-          // Replace ANSI escape sequence.
-          // deno-lint-ignore no-control-regex
-          const ansiEscapePattern = /\x1b(\[[0-9;?]*[A-Za-z]|\[[0-9;?]|\(B)/g;
+        for (const line of lines) {
+          const lastLine = (await fn.getline(denops, "$")).replaceAll(
+            /\d+/g,
+            "0",
+          );
+          const compareLine = line.replaceAll(/\d+/g, "0");
+          const index = Math.floor(compareLine.length / 3);
+          const head = lastLine.slice(0, index);
+          const tail = lastLine.slice(-index);
 
-          const lines = data.replace(ansiEscapePattern, "").split(/\r?\n|\r/)
-            .filter((str) => str.length > 0);
-
-          for (const line of lines) {
-            const lastLine = (await fn.getline(denops, "$")).replaceAll(
-              /\d+/g,
-              "0",
+          if (
+            lastLine.length === 0 ||
+            (compareLine.length > 15 && compareLine.startsWith(head)) ||
+            (compareLine.length > 15 && compareLine.endsWith(tail))
+          ) {
+            // Overwrite current line
+            await fn.setbufline(
+              denops,
+              this.#bufNr,
+              "$",
+              line,
             );
-            const compareLine = line.replaceAll(/\d+/g, "0");
-            const index = Math.floor(compareLine.length / 3);
-            const head = lastLine.slice(0, index);
-            const tail = lastLine.slice(-index);
-
-            if (
-              lastLine.length === 0 ||
-              (compareLine.length > 15 && compareLine.startsWith(head)) ||
-              (compareLine.length > 15 && compareLine.endsWith(tail))
-            ) {
-              // Overwrite current line
-              await fn.setbufline(
-                denops,
-                this.#bufNr,
-                "$",
-                line,
-              );
-            } else {
-              await fn.appendbufline(
-                denops,
-                this.#bufNr,
-                "$",
-                line,
-              );
-            }
+          } else {
+            await fn.appendbufline(
+              denops,
+              this.#bufNr,
+              "$",
+              line,
+            );
           }
-
-          if (passwordRegex.exec(data)) {
-            // NOTE: Move the cursor to make the output more visible.
-            await denops.cmd("normal! zz");
-
-            const secret = await fn.inputsecret(denops, "Password: ");
-            if (secret.length > 0) {
-              this.#pty.write(secret + "\n");
-            }
-          }
-
-          await this.#moveCursorLast(denops);
-          this.#prompt = await fn.getline(denops, "$");
         }
 
-        await new Promise((r) => setTimeout(r, 20));
+        if (passwordRegex.exec(data)) {
+          // NOTE: Move the cursor to make the output more visible.
+          await denops.cmd("normal! zz");
+
+          const secret = await fn.inputsecret(denops, "Password: ");
+          if (secret.length > 0) {
+            this.#pty.write(secret + "\n");
+          }
+        } else {
+          // NOTE: Move the cursor to view output.
+          await fn.cursor(denops, "$", 0);
+        }
+
+        this.#prompt = await fn.getline(denops, "$");
       }
+
+      this.#pty.close();
+      this.#pty = null;
 
       await this.#newPrompt(denops, uiParams);
     } else {
