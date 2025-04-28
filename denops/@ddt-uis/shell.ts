@@ -833,10 +833,12 @@ export class Ui extends BaseUi<Params> {
         // deno-lint-ignore no-control-regex
         const ansiEscapePattern = /\x1b(\[[0-9;?]*[A-Za-z]|\[[0-9;?]|\(B)/g;
 
-        const lines = data.replace(ansiEscapePattern, "").split(/\r?\n|\r/)
-          .filter((str) => str.length > 0);
-
-        for (const line of lines) {
+        for (
+          // deno-lint-ignore no-control-regex
+          const line of data.split(/\x1b\[0G|\r|\n/).map((str) =>
+            str.replaceAll(ansiEscapePattern, "")
+          ).filter((str) => str.length > 0)
+        ) {
           const lastLine = (await fn.getline(denops, "$")).replaceAll(
             /\d+/g,
             "0",
@@ -878,7 +880,7 @@ export class Ui extends BaseUi<Params> {
           }
         } else {
           // NOTE: Move the cursor to view output.
-          await fn.cursor(denops, "$", 0);
+          await fn.cursor(denops, await fn.line(denops, "$"), 0);
         }
 
         this.#prompt = await fn.getline(denops, "$");
