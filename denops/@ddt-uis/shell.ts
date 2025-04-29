@@ -21,6 +21,7 @@ import { relative } from "jsr:@std/path@~1.0.3/relative";
 import { isAbsolute } from "jsr:@std/path@~1.0.2/is-absolute";
 import { assertEquals } from "jsr:@std/assert@~1.0.2/equals";
 import { expandGlob } from "jsr:@std/fs@~1.0.2/expand-glob";
+import { stripAnsiCode } from "jsr:@std/fmt@~1.0.7/colors";
 import { Pty } from "jsr:@sigma/pty-ffi@~0.36.0";
 //import { parse } from 'jsr:@fcrozatier/monarch@~2.3.2';
 
@@ -812,6 +813,7 @@ export class Ui extends BaseUi<Params> {
         ...(await fn.environ(denops) as Record<string, string>),
         GIT_PAGER: "cat",
         MANPAGER: "cat",
+        NO_COLOR: "1",
         PAGER: "cat",
         TERM: "dumb",
       };
@@ -830,13 +832,12 @@ export class Ui extends BaseUi<Params> {
 
       for await (const data of this.#pty.readable) {
         // Replace ANSI escape sequence.
-        // deno-lint-ignore no-control-regex
-        const ansiEscapePattern = /\x1b(\[[0-9;?]*[A-Za-z]|\[[0-9;?]|\(B)/g;
+        //const ansiEscapePattern = /\x1b(\[[0-9;?]*[A-Za-z]|\[[0-9;?]|\(B)/g;
 
         for (
           // deno-lint-ignore no-control-regex
           const line of data.split(/\x1b\[0G|\r|\n/).map((str) =>
-            str.replaceAll(ansiEscapePattern, "")
+            stripAnsiCode(str)
           ).filter((str) => str.length > 0)
         ) {
           const lastLine = (await fn.getline(denops, "$")).replaceAll(
