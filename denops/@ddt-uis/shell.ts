@@ -876,11 +876,15 @@ export class Ui extends BaseUi<Params> {
 
           const secret = await fn.inputsecret(denops, "Password: ");
           if (secret.length > 0) {
-            this.#pty.write(secret + "\n");
+            this.#pty.write(`${secret}\n`);
           }
         } else {
           // NOTE: Move the cursor to view output.
-          await fn.cursor(denops, await fn.line(denops, "$"), 0);
+          await fn.cursor(
+            denops,
+            await fn.line(denops, "$"),
+            await fn.col(denops, "$"),
+          );
         }
 
         this.#prompt = await fn.getline(denops, "$");
@@ -891,7 +895,7 @@ export class Ui extends BaseUi<Params> {
 
       await this.#newPrompt(denops, uiParams);
     } else {
-      this.#pty.write(commandLine + "\n");
+      this.#pty.write(`${commandLine}\n`);
     }
   }
 }
