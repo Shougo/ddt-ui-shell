@@ -511,18 +511,20 @@ export class Ui extends BaseUi<Params> {
     await denops.call("ddt#ui#shell#_split", params);
 
     const prevBufnr = await fn.bufnr(denops);
-    const removeCurrentBuffer = params.split.length === 0 &&
-      (await fn.bufname(denops)).length === 0 &&
-      !await op.modified.getLocal(denops);
 
     const bufferName = `ddt-shell-${options.name}`;
     this.#bufNr = await fn.bufadd(denops, bufferName);
 
     await denops.cmd(`buffer ${this.#bufNr}`);
 
+    const removeCurrentBuffer = params.split.length === 0 &&
+      (await fn.bufname(denops, prevBufnr)).length === 0 &&
+      await fn.bufexists(denops, prevBufnr) &&
+      (await fn.getbufvar(denops, prevBufnr, "&modified")) === 0;
+
     // Remove current buffer when empty buffer.
     if (removeCurrentBuffer) {
-      await denops.cmd(`bwipeout! ${prevBufnr}`);
+      await denops.cmd(`silent! bwipeout! ${prevBufnr}`);
     }
 
     if (params.startInsert) {
