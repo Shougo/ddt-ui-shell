@@ -10,7 +10,6 @@ import { printError, safeStat } from "jsr:@shougo/ddt-vim@~1.1.0/utils";
 import type { Denops } from "jsr:@denops/std@~7.5.0";
 import * as fn from "jsr:@denops/std@~7.5.0/function";
 import * as vars from "jsr:@denops/std@~7.5.0/variable";
-import * as op from "jsr:@denops/std@~7.5.0/option";
 import { batch } from "jsr:@denops/std@~7.5.0/batch";
 import * as autocmd from "jsr:@denops/std@~7.5.0/autocmd";
 
@@ -322,7 +321,7 @@ export class Ui extends BaseUi<Params> {
           return;
         }
 
-        const lastLine = await fn.getline(args.denops, "$");
+        const lastLine = await this.#getBufLine(denops, "$");
         if (lastLine === args.uiParams.prompt + " ") {
           // Redraw the prompt
           await this.#newPrompt(args.denops, args.uiParams);
@@ -486,7 +485,7 @@ export class Ui extends BaseUi<Params> {
 
     await denops.cmd(`buffer ${this.#bufNr}`);
 
-    const lastLine = await fn.getline(denops, "$");
+    const lastLine = await this.#getBufLine(denops, "$");
     if (this.#cwd !== "" && newCwd !== this.#cwd) {
       // Current directory is changed
       await this.#newCdPrompt(denops, params, newCwd);
@@ -548,6 +547,11 @@ export class Ui extends BaseUi<Params> {
     await this.#newPrompt(denops, params);
   }
 
+  async #getBufLine(denops: Denops, lineNr: "$" | number): Promise<string> {
+    const bufLines = await fn.getbufline(denops, this.#bufNr, lineNr);
+    return bufLines.length === 0 ? "" : bufLines[0];
+  }
+
   async #newPrompt(denops: Denops, params: Params, commandLine: string = "") {
     if (this.#pty) {
       this.#pty.close();
@@ -563,7 +567,7 @@ export class Ui extends BaseUi<Params> {
     promptLines = promptLines.concat(userPrompts);
     promptLines.push(this.#prompt);
 
-    const lastLine = await fn.getline(denops, "$");
+    const lastLine = await this.#getBufLine(denops, "$");
     if (lastLine === params.prompt + " ") {
       const userPromptPos = await searchUserPrompt(
         denops,
@@ -828,7 +832,7 @@ export class Ui extends BaseUi<Params> {
 
       await fn.appendbufline(denops, this.#bufNr, "$", "");
       await this.#moveCursorLast(denops);
-      this.#prompt = await fn.getline(denops, "$");
+      this.#prompt = await this.#getBufLine(denops, "$");
 
       const passwordRegex = new RegExp(uiParams.passwordPattern);
 
@@ -842,7 +846,7 @@ export class Ui extends BaseUi<Params> {
             stripAnsiCode(str)
           ).filter((str) => str.length > 0)
         ) {
-          const lastLine = (await fn.getline(denops, "$")).replaceAll(
+          const lastLine = (await this.#getBufLine(denops, "$")).replaceAll(
             /\d+/g,
             "0",
           );
@@ -881,16 +885,19 @@ export class Ui extends BaseUi<Params> {
           if (secret.length > 0) {
             this.#pty.write(`${secret}\n`);
           }
-        } else {
+        } else if (await fn.bufnr(denops) === this.#bufNr) {
           // NOTE: Move the cursor to view output.
           await fn.cursor(
             denops,
             await fn.line(denops, "$"),
             await fn.col(denops, "$"),
           );
+        } else {
+          // NOTE: It is not ddt-ui-shell buffer.
+          await denops.cmd("stopinsert");
         }
 
-        this.#prompt = await fn.getline(denops, "$");
+        this.#prompt = await this.#getBufLine(denops, "$");
       }
 
       this.#pty.close();
@@ -981,7 +988,7 @@ async function getCommandLine(
   denops: Denops,
   promptPattern: string,
   lastPrompt: string,
-  lineNr: string | number = ".",
+  lineNr: "." | number = ".",
 ) {
   const currentLine = await fn.getline(denops, lineNr);
   if (
