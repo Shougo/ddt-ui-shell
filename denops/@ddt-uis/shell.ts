@@ -558,14 +558,14 @@ export class Ui extends BaseUi<Params> {
       this.#pty = null;
     }
 
-    this.#prompt = `${params.prompt} ${commandLine}`;
+    await this.#updatePrompt(denops, params.prompt);
 
     let promptLines: string[] = [];
     const userPrompts = params.userPrompt.length !== 0
       ? (await denops.eval(params.userPrompt) as string).split("\n")
       : [];
     promptLines = promptLines.concat(userPrompts);
-    promptLines.push(this.#prompt);
+    promptLines.push(`${params.prompt} ${commandLine}`);
 
     const lastLine = await this.#getBufLine(denops, "$");
     if (lastLine === params.prompt + " ") {
@@ -594,6 +594,7 @@ export class Ui extends BaseUi<Params> {
     }
 
     await fn.setbufvar(denops, this.#bufNr, "&modified", false);
+    await vars.b.set(denops, "ddt_ui_shell_prompt", params.prompt);
 
     // Highlight prompts
     const promises = [];
@@ -631,6 +632,11 @@ export class Ui extends BaseUi<Params> {
     await Promise.all(promises);
 
     await this.#moveCursorLast(denops);
+  }
+
+  async #updatePrompt(denops: Denops, prompt: string) {
+    this.#prompt = prompt;
+    await vars.b.set(denops, "ddt_ui_shell_prompt", prompt);
   }
 
   async #moveCursorLast(denops: Denops) {
@@ -832,7 +838,7 @@ export class Ui extends BaseUi<Params> {
 
       await fn.appendbufline(denops, this.#bufNr, "$", "");
       await this.#moveCursorLast(denops);
-      this.#prompt = await this.#getBufLine(denops, "$");
+      this.#updatePrompt(denops, await this.#getBufLine(denops, "$"));
 
       const passwordRegex = new RegExp(uiParams.passwordPattern);
 
@@ -897,7 +903,7 @@ export class Ui extends BaseUi<Params> {
           await denops.cmd("stopinsert");
         }
 
-        this.#prompt = await this.#getBufLine(denops, "$");
+        this.#updatePrompt(denops, await this.#getBufLine(denops, "$"));
       }
 
       this.#pty.close();
