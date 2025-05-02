@@ -321,7 +321,7 @@ export class Ui extends BaseUi<Params> {
           return;
         }
 
-        const lastLine = await this.#getBufLine(denops, "$");
+        const lastLine = await this.#getBufLine(args.denops, "$");
         if (lastLine === args.uiParams.prompt + " ") {
           // Redraw the prompt
           await this.#newPrompt(args.denops, args.uiParams);
@@ -537,7 +537,7 @@ export class Ui extends BaseUi<Params> {
       "ddt-shell",
       (helper: autocmd.GroupHelper) => {
         helper.define(
-          "CursorMovedI",
+          "CursorMovedI,TextChangedI,TextChangedP,InsertEnter",
           "<buffer>",
           "call ddt#ui#shell#_check_prompt()",
         );
@@ -558,7 +558,7 @@ export class Ui extends BaseUi<Params> {
       this.#pty = null;
     }
 
-    await this.#updatePrompt(denops, params.prompt);
+    await this.#updatePrompt(denops, params.prompt + " ");
 
     let promptLines: string[] = [];
     const userPrompts = params.userPrompt.length !== 0
@@ -594,7 +594,6 @@ export class Ui extends BaseUi<Params> {
     }
 
     await fn.setbufvar(denops, this.#bufNr, "&modified", false);
-    await vars.b.set(denops, "ddt_ui_shell_prompt", params.prompt);
 
     // Highlight prompts
     const promises = [];
@@ -881,6 +880,8 @@ export class Ui extends BaseUi<Params> {
               line,
             );
           }
+
+          this.#updatePrompt(denops, line);
         }
 
         if (passwordRegex.exec(data)) {
@@ -902,12 +903,12 @@ export class Ui extends BaseUi<Params> {
           // NOTE: It is not ddt-ui-shell buffer.
           await denops.cmd("stopinsert");
         }
-
-        this.#updatePrompt(denops, await this.#getBufLine(denops, "$"));
       }
 
-      this.#pty.close();
-      this.#pty = null;
+      if (this.#pty) {
+        this.#pty.close();
+        this.#pty = null;
+      }
 
       await this.#newPrompt(denops, uiParams);
     } else {

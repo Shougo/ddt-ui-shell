@@ -72,6 +72,27 @@ function ddt#ui#shell#_check_prompt() abort
   endif
 
   const current_line = '.'->getline()
+  if current_line ==# ''
+    return
+  endif
+
+  if '$'->line() ==# '.'->line()
+    if !'b:ddt_ui_shell_prompt'->exists()
+      return
+    endif
+
+    " Check the last prompt line
+    if current_line->stridx(b:ddt_ui_shell_prompt) == 0
+      return
+    endif
+
+    " Overwrite prompt
+    call setline('.', b:ddt_ui_shell_prompt)
+    startinsert!
+
+    return
+  endif
+
   const check_pattern = '^' .. b:ddt_ui_shell_prompt_pattern
   if current_line !~# check_pattern
     return
