@@ -20,8 +20,12 @@ import { relative } from "jsr:@std/path@~1.0.3/relative";
 import { isAbsolute } from "jsr:@std/path@~1.0.2/is-absolute";
 import { assertEquals } from "jsr:@std/assert@~1.0.2/equals";
 import { expandGlob } from "jsr:@std/fs@~1.0.2/expand-glob";
-import { stripAnsiCode } from "jsr:@std/fmt@~1.0.7/colors";
 import { Pty } from "jsr:@sigma/pty-ffi@~0.36.0";
+import {
+  type Annotation,
+  trimAndParse,
+} from "jsr:@lambdalisue/ansi-escape-code@~1.0.3";
+
 //import { parse } from 'jsr:@fcrozatier/monarch@~2.3.2';
 
 type ExprNumber = string | number;
@@ -824,7 +828,6 @@ export class Ui extends BaseUi<Params> {
         ...(await fn.environ(denops) as Record<string, string>),
         GIT_PAGER: "cat",
         MANPAGER: "cat",
-        NO_COLOR: "1",
         PAGER: "cat",
         TERM: "dumb",
       };
@@ -842,15 +845,16 @@ export class Ui extends BaseUi<Params> {
       const passwordRegex = new RegExp(uiParams.passwordPattern);
 
       for await (const data of this.#pty.readable) {
-        // Replace ANSI escape sequence.
-        //const ansiEscapePattern = /\x1b(\[[0-9;?]*[A-Za-z]|\[[0-9;?]|\(B)/g;
-
         for (
           // deno-lint-ignore no-control-regex
-          const line of data.split(/\x1b\[0G|\r|\n/).map((str) =>
-            stripAnsiCode(str)
-          ).filter((str) => str.length > 0)
+          const line of data.split(/\x1b\[0G|\r|\n/).filter((str) =>
+            str.length > 0
+          )
         ) {
+          const [trimmed, _annotations] = trimAndParse(line);
+          //console.log(trimmed);
+          //console.log(calculateLengths(annotations));
+
           const lastLine = (await this.#getBufLine(denops, "$")).replaceAll(
             /\d+/g,
             "0",
@@ -870,18 +874,18 @@ export class Ui extends BaseUi<Params> {
               denops,
               this.#bufNr,
               "$",
-              line,
+              trimmed,
             );
           } else {
             await fn.appendbufline(
               denops,
               this.#bufNr,
               "$",
-              line,
+              trimmed,
             );
           }
 
-          this.#updatePrompt(denops, line);
+          this.#updatePrompt(denops, trimmed);
         }
 
         if (passwordRegex.exec(data)) {
@@ -1129,6 +1133,29 @@ async function expandDirectory(
   return null;
 }
 
+interface AnnotationWithLength extends Annotation {
+  length: number;
+}
+
+function calculateLengths(annotations: Annotation[]): AnnotationWithLength[] {
+  const result: AnnotationWithLength[] = [];
+
+  for (let i = 0; i < annotations.length; i++) {
+    const current = annotations[i];
+    const next = annotations[i + 1];
+
+    // Calculate length based on the difference between current and next offset
+    const length = next ? next.offset - current.offset : 0;
+
+    result.push({
+      ...current,
+      length,
+    });
+  }
+
+  return result;
+}
+
 Deno.test("splitArgs should split a simple command", () => {
   assertEquals(splitArgs("ls -la"), ["ls", "-la"]);
 });
@@ -1147,4 +1174,57 @@ Deno.test("splitArgs should handle multiple spaces", () => {
 
 Deno.test("splitArgs should handle empty input", () => {
   assertEquals(splitArgs(""), []);
+});
+
+Deno.test("calculateLengths - Basic case", () => {
+  const annotations: Annotation[] = [
+    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } } },
+    { offset: 2, raw: "\x1b[30m", csi: { sgr: { foreground: 0 } } },
+    { offset: 4, raw: "\x1b[31m", csi: { sgr: { foreground: 1 } } },
+    { offset: 5, raw: "\x1b[m", csi: { sgr: { reset: true } } },
+  ];
+
+  const expected: AnnotationWithLength[] = [
+    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } }, length: 2 },
+    { offset: 2, raw: "\x1b[30m", csi: { sgr: { foreground: 0 } }, length: 2 },
+    { offset: 4, raw: "\x1b[31m", csi: { sgr: { foreground: 1 } }, length: 1 },
+    { offset: 5, raw: "\x1b[m", csi: { sgr: { reset: true } }, length: 0 },
+  ];
+
+  const result = calculateLengths(annotations);
+  assertEquals(result, expected);
+});
+
+Deno.test("calculateLengths - Single annotation", () => {
+  const annotations: Annotation[] = [
+    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } } },
+  ];
+
+  const expected: AnnotationWithLength[] = [
+    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } }, length: 0 },
+  ];
+
+  const result = calculateLengths(annotations);
+  assertEquals(result, expected);
+});
+
+Deno.test("calculateLengths - Empty annotations", () => {
+  assertEquals(calculateLengths([]), []);
+});
+
+Deno.test("calculateLengths - Multiple annotations with gaps", () => {
+  const annotations: Annotation[] = [
+    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } } },
+    { offset: 5, raw: "\x1b[30m", csi: { sgr: { foreground: 0 } } },
+    { offset: 10, raw: "\x1b[31m", csi: { sgr: { foreground: 1 } } },
+  ];
+
+  const expected: AnnotationWithLength[] = [
+    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } }, length: 5 },
+    { offset: 5, raw: "\x1b[30m", csi: { sgr: { foreground: 0 } }, length: 5 },
+    { offset: 10, raw: "\x1b[31m", csi: { sgr: { foreground: 1 } }, length: 0 },
+  ];
+
+  const result = calculateLengths(annotations);
+  assertEquals(result, expected);
 });
