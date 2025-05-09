@@ -864,28 +864,31 @@ export class Ui extends BaseUi<Params> {
           const head = lastLine.slice(0, index);
           const tail = lastLine.slice(-index);
 
-          if (
-            lastLine.length === 0 ||
-            (compareLine.length > 15 && compareLine.startsWith(head)) ||
-            (compareLine.length > 15 && compareLine.endsWith(tail))
-          ) {
-            // Overwrite current line
-            await fn.setbufline(
-              denops,
-              this.#bufNr,
-              "$",
-              trimmed,
-            );
-          } else {
-            await fn.appendbufline(
-              denops,
-              this.#bufNr,
-              "$",
-              trimmed,
-            );
-          }
+          // NOTE: Use batch to optimize.
+          await batch(denops, async (denops: Denops) => {
+            if (
+              lastLine.length === 0 ||
+              (compareLine.length > 15 && compareLine.startsWith(head)) ||
+              (compareLine.length > 15 && compareLine.endsWith(tail))
+            ) {
+              // Overwrite current line
+              await fn.setbufline(
+                denops,
+                this.#bufNr,
+                "$",
+                trimmed,
+              );
+            } else {
+              await fn.appendbufline(
+                denops,
+                this.#bufNr,
+                "$",
+                trimmed,
+              );
+            }
 
-          this.#updatePrompt(denops, trimmed);
+            this.#updatePrompt(denops, trimmed);
+          });
         }
 
         if (passwordRegex.exec(data)) {
