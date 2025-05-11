@@ -88,11 +88,15 @@ send
 ------------------------------------------------------------------------------
 PARAMS                                                   *ddt-ui-shell-params*
 
-                                       *ddt-ui-shell-param-ANSIColorHighlight*
-ANSIColorHighlight{0-15} string
+                                      *ddt-ui-shell-param-ANSIColorHighlights*
+ANSIColorHighlights string[]
 		Sets the highight group name of ANSI colors.
+		NOTE: It must be 16 length.
 
-		Default: ""
+		Default: [
+		  "", "", "", "", "", "", "", "",
+		  "", "", "", "", "", "", "", "",
+		]
 
                                                       *ddt-ui-shell-param-cwd*
 cwd		string
