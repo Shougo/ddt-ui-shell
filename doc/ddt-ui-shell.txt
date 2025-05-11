@@ -88,6 +88,12 @@ send
 ------------------------------------------------------------------------------
 PARAMS                                                   *ddt-ui-shell-params*
 
+                                       *ddt-ui-shell-param-ANSIColorHighlight*
+ANSIColorHighlight{0-15} string
+		Sets the highight group name of ANSI colors.
+
+		Default: ""
+
                                                       *ddt-ui-shell-param-cwd*
 cwd		string
 		Current directory.

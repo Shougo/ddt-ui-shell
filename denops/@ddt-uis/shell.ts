@@ -31,6 +31,22 @@ import {
 type ExprNumber = string | number;
 
 export type Params = {
+  ANSIColorHighlight0: string;
+  ANSIColorHighlight1: string;
+  ANSIColorHighlight2: string;
+  ANSIColorHighlight3: string;
+  ANSIColorHighlight4: string;
+  ANSIColorHighlight5: string;
+  ANSIColorHighlight6: string;
+  ANSIColorHighlight7: string;
+  ANSIColorHighlight8: string;
+  ANSIColorHighlight9: string;
+  ANSIColorHighlight10: string;
+  ANSIColorHighlight11: string;
+  ANSIColorHighlight12: string;
+  ANSIColorHighlight13: string;
+  ANSIColorHighlight14: string;
+  ANSIColorHighlight15: string;
   cwd: string;
   exprParams: (keyof Params)[];
   floatingBorder: string;
@@ -379,6 +395,22 @@ export class Ui extends BaseUi<Params> {
 
   override params(): Params {
     return {
+      ANSIColorHighlight0: "",
+      ANSIColorHighlight1: "",
+      ANSIColorHighlight2: "",
+      ANSIColorHighlight3: "",
+      ANSIColorHighlight4: "",
+      ANSIColorHighlight5: "",
+      ANSIColorHighlight6: "",
+      ANSIColorHighlight7: "",
+      ANSIColorHighlight8: "",
+      ANSIColorHighlight9: "",
+      ANSIColorHighlight10: "",
+      ANSIColorHighlight11: "",
+      ANSIColorHighlight12: "",
+      ANSIColorHighlight13: "",
+      ANSIColorHighlight14: "",
+      ANSIColorHighlight15: "",
       cwd: "",
       exprParams: [
         "winCol",
