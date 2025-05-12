@@ -1142,7 +1142,14 @@ async function getHistory(denops: Denops, params: Params): Promise<string[]> {
 
   try {
     const content = await Deno.readTextFile(params.shellHistoryPath);
-    return content.split("\n").filter((line: string) => line.trim() !== "");
+    const lines = content.split("\n").filter((line: string) =>
+      line.trim() !== ""
+    );
+
+    // Remove duplicated lines
+    return lines.filter((line, index, array) => {
+      return index === 0 || line !== array[index - 1];
+    });
   } catch (error) {
     printError(denops, "Error reading history file:", error);
     return [];
