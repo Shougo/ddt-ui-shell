@@ -88,6 +88,12 @@ send
 ------------------------------------------------------------------------------
 PARAMS                                                   *ddt-ui-shell-params*
 
+                                                  *ddt-ui-shell-param-aliases*
+aliases		Record<string, string>
+		Define command aliases.
+
+		Default: []
+
                                       *ddt-ui-shell-param-ANSIColorHighlights*
 ANSIColorHighlights string[]
 		Sets the highight group name of ANSI colors.

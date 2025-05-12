@@ -31,6 +31,7 @@ import {
 type ExprNumber = string | number;
 
 export type Params = {
+  aliases: Record<string, string>;
   ANSIColorHighlights: string[];
   cwd: string;
   exprParams: (keyof Params)[];
@@ -380,6 +381,7 @@ export class Ui extends BaseUi<Params> {
 
   override params(): Params {
     return {
+      aliases: {},
       ANSIColorHighlights: [
         "",
         "",
@@ -809,10 +811,18 @@ export class Ui extends BaseUi<Params> {
         return;
       }
 
-      const [cmd, ...cmdArgs] = await parseCommandLine(
+      let [cmd, ...cmdArgs] = await parseCommandLine(
         this.#cwd,
         commandLine,
       );
+
+      if (uiParams.aliases[cmd]) {
+        // TODO: More improved parse.
+        [cmd, ...cmdArgs] = await parseCommandLine(
+          this.#cwd,
+          commandLine.replace(cmd, uiParams.aliases[cmd]),
+        );
+      }
 
       if (!uiParams.noSaveHistoryCommands.includes(cmd)) {
         await appendHistory(denops, uiParams, commandLine);
