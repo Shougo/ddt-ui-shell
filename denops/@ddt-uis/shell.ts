@@ -858,7 +858,7 @@ export class Ui extends BaseUi<Params> {
         GIT_PAGER: "cat",
         MANPAGER: "cat",
         PAGER: "cat",
-        TERM: "dumb",
+        TERM: "xterm",
       };
 
       this.#pty = new Pty(cmd, {
