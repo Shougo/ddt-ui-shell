@@ -30,9 +30,17 @@ import {
 
 type ExprNumber = string | number;
 
+export type ANSIColorHighlights = {
+  bgs?: string[];
+  bold?: string;
+  fgs?: string[];
+  italic?: string;
+  underline?: string;
+};
+
 export type Params = {
   aliases: Record<string, string>;
-  ANSIColorHighlights: string[];
+  ansiColorHighlights: ANSIColorHighlights;
   cwd: string;
   exprParams: (keyof Params)[];
   floatingBorder: string;
@@ -382,24 +390,7 @@ export class Ui extends BaseUi<Params> {
   override params(): Params {
     return {
       aliases: {},
-      ANSIColorHighlights: [
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-      ],
+      ansiColorHighlights: {},
       cwd: "",
       exprParams: [
         "winCol",
@@ -920,15 +911,77 @@ export class Ui extends BaseUi<Params> {
 
             for (const annotation of calculateLengths(annotations)) {
               const foreground = annotation.csi.sgr?.foreground;
+              const background = annotation.csi.sgr?.background;
+              const italic = annotation.csi.sgr?.italic;
+              const bold = annotation.csi.sgr?.bold;
+              const underline = annotation.csi.sgr?.underline;
+
               if (
-                is.Number(foreground) && foreground > 0 && foreground < 16 &&
-                uiParams.ANSIColorHighlights[foreground].length > 0
+                is.Number(background) && background > 0 && background < 16 &&
+                uiParams.ansiColorHighlights.bgs
               ) {
                 denops.call(
                   "ddt#ui#shell#_highlight",
-                  uiParams.ANSIColorHighlights[foreground],
-                  `ANSIColor${foreground}`,
-                  1,
+                  uiParams.ansiColorHighlights.bgs[background],
+                  `ANSIColorBG${background}`,
+                  5,
+                  this.#bufNr,
+                  lastLineNr,
+                  annotation.offset + 1,
+                  annotation.length,
+                );
+              }
+              if (
+                is.Boolean(bold) && uiParams.ansiColorHighlights.bold
+              ) {
+                denops.call(
+                  "ddt#ui#shell#_highlight",
+                  uiParams.ansiColorHighlights.bold,
+                  `ANSIColorBold`,
+                  100,
+                  this.#bufNr,
+                  lastLineNr,
+                  annotation.offset + 1,
+                  annotation.length,
+                );
+              }
+              if (
+                is.Number(foreground) && foreground > 0 && foreground < 16 &&
+                uiParams.ansiColorHighlights.fgs
+              ) {
+                denops.call(
+                  "ddt#ui#shell#_highlight",
+                  uiParams.ansiColorHighlights.fgs[foreground],
+                  `ANSIColorFG${foreground}`,
+                  10,
+                  this.#bufNr,
+                  lastLineNr,
+                  annotation.offset + 1,
+                  annotation.length,
+                );
+              }
+              if (
+                is.Boolean(italic) && uiParams.ansiColorHighlights.italic
+              ) {
+                denops.call(
+                  "ddt#ui#shell#_highlight",
+                  uiParams.ansiColorHighlights.italic,
+                  `ANSIColorItalic`,
+                  100,
+                  this.#bufNr,
+                  lastLineNr,
+                  annotation.offset + 1,
+                  annotation.length,
+                );
+              }
+              if (
+                is.Boolean(underline) && uiParams.ansiColorHighlights.underline
+              ) {
+                denops.call(
+                  "ddt#ui#shell#_highlight",
+                  uiParams.ansiColorHighlights.underline,
+                  `ANSIColorUnderline`,
+                  100,
                   this.#bufNr,
                   lastLineNr,
                   annotation.offset + 1,

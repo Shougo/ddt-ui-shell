@@ -94,15 +94,28 @@ aliases		Record<string, string>
 
 		Default: []
 
-                                      *ddt-ui-shell-param-ANSIColorHighlights*
-ANSIColorHighlights string[]
+                                      *ddt-ui-shell-param-ansiColorHighlights*
+ansiColorHighlights ANSIColorHighlights
 		Sets the highight group name of ANSI colors.
-		NOTE: It must be 16 length.
 
-		Default: [
-		  "", "", "", "", "", "", "", "",
-		  "", "", "", "", "", "", "", "",
-		]
+		bgs:	string[]
+			Background colors.
+			NOTE: It must be 16 length.
+
+		bold:	string
+			Bold color.
+
+		fgs:	string[]
+			Foreground colors.
+			NOTE: It must be 16 length.
+
+		italic:	string
+			Italic color.
+
+		underline string
+			Underlined color.
+
+		Default: {}
 
                                                       *ddt-ui-shell-param-cwd*
 cwd		string
@@ -282,6 +295,9 @@ FREQUENTLY ASKED QUESTIONS (FAQ)                            *ddt-ui-shell-faq*
 
 ==============================================================================
 COMPATIBILITY                                     *ddt-ui-shell-compatibility*
+
+2025.05.14
+* Rename "ANSIColorHighlights" param to "ansiColorHighlights".
 
 2025.02.26
 * Replace current userPrompt if possible.

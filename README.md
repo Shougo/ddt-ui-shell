@@ -8,7 +8,6 @@ It supports ANSI colors.
 
 ![2025-05-11_11-36](https://github.com/user-attachments/assets/14845735-5d03-4a20-bdf4-690dc16e658c)
 
-
 ## Required
 
 ### denops.vim
