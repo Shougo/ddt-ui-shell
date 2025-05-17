@@ -866,10 +866,7 @@ export class Ui extends BaseUi<Params> {
 
       for await (const data of this.#pty.readable) {
         for (
-          // deno-lint-ignore no-control-regex
-          const line of data.split(/\x1b\[0G|\r|\n/).filter((str) =>
-            str.length > 0
-          )
+          const line of data.split(/\r|\n/).filter((str) => str.length > 0)
         ) {
           const [trimmed, annotations] = trimAndParse(line);
           //console.log(trimmed);
@@ -879,42 +876,22 @@ export class Ui extends BaseUi<Params> {
             /\d+/g,
             "0",
           );
-          const compareLine = line.replaceAll(/\d+/g, "0");
-          const index = Math.floor(compareLine.length / 3);
-          const head = lastLine.slice(0, index);
-          const tail = lastLine.slice(-index);
           let lastLineNr = await fn.line(denops, "$");
 
           // NOTE: Use batch to optimize.
           await batch(denops, async (denops: Denops) => {
-            if (
-              lastLine.length === 0 ||
-              (compareLine.length > 15 && compareLine.startsWith(head)) ||
-              (compareLine.length > 15 && compareLine.endsWith(tail))
-            ) {
-              // Overwrite current line
-              await fn.setbufline(
-                denops,
-                this.#bufNr,
-                "$",
-                trimmed,
-              );
-            } else {
-              await fn.appendbufline(
-                denops,
-                this.#bufNr,
-                "$",
-                trimmed,
-              );
-              lastLineNr += 1;
-            }
-
+            let overwrite = false;
             for (const annotation of calculateLengths(annotations)) {
               const foreground = annotation.csi.sgr?.foreground;
               const background = annotation.csi.sgr?.background;
               const italic = annotation.csi.sgr?.italic;
               const bold = annotation.csi.sgr?.bold;
               const underline = annotation.csi.sgr?.underline;
+
+              if (annotation.csi.cha == 0) {
+                // Overwrite current line
+                overwrite = true;
+              }
 
               if (
                 is.Number(background) && background > 0 && background < 16 &&
@@ -988,6 +965,23 @@ export class Ui extends BaseUi<Params> {
                   annotation.length,
                 );
               }
+            }
+
+            if (overwrite || lastLine.length === 0) {
+              await fn.setbufline(
+                denops,
+                this.#bufNr,
+                "$",
+                trimmed,
+              );
+            } else {
+              await fn.appendbufline(
+                denops,
+                this.#bufNr,
+                "$",
+                trimmed,
+              );
+              lastLineNr += 1;
             }
 
             this.#updatePrompt(denops, trimmed);
