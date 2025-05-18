@@ -891,6 +891,13 @@ export class Ui extends BaseUi<Params> {
               if (annotation.csi.cha == 0) {
                 // Overwrite current line
                 overwrite = true;
+
+                await fn.setbufline(
+                  denops,
+                  this.#bufNr,
+                  "$",
+                  trimmed,
+                );
               }
 
               if (
@@ -967,14 +974,14 @@ export class Ui extends BaseUi<Params> {
               }
             }
 
-            if (overwrite || lastLine.length === 0) {
+            if (lastLine.length === 0) {
               await fn.setbufline(
                 denops,
                 this.#bufNr,
                 "$",
                 trimmed,
               );
-            } else {
+            } else if (!overwrite) {
               await fn.appendbufline(
                 denops,
                 this.#bufNr,
