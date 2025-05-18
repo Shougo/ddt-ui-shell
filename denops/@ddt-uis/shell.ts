@@ -878,15 +878,6 @@ export class Ui extends BaseUi<Params> {
           );
           let lastLineNr = await fn.line(denops, "$");
 
-          if (lastLine.length === 0) {
-            await fn.setbufline(
-              denops,
-              this.#bufNr,
-              "$",
-              trimmed,
-            );
-          }
-
           type ANSIHighlight = {
             highlight: string;
             name: string;
@@ -898,7 +889,7 @@ export class Ui extends BaseUi<Params> {
           // NOTE: Use batch to optimize.
           await batch(denops, async (denops: Denops) => {
             let overwrite = false;
-            let currentHighlights: ANSIHighlight[] = [];
+            const currentHighlights: ANSIHighlight[] = [];
             for (const annotation of calculateLengths(annotations)) {
               const foreground = annotation.csi.sgr?.foreground;
               const background = annotation.csi.sgr?.background;
@@ -909,13 +900,6 @@ export class Ui extends BaseUi<Params> {
               if (annotation.csi?.cha === 0 || annotation.csi?.el === 0) {
                 // Overwrite current line
                 overwrite = true;
-
-                await fn.setbufline(
-                  denops,
-                  this.#bufNr,
-                  "$",
-                  trimmed,
-                );
               }
 
               if (
@@ -977,7 +961,14 @@ export class Ui extends BaseUi<Params> {
               }
             }
 
-            if (!overwrite) {
+            if (overwrite || lastLine.length === 0) {
+              await fn.setbufline(
+                denops,
+                this.#bufNr,
+                "$",
+                trimmed,
+              );
+            } else {
               await fn.appendbufline(
                 denops,
                 this.#bufNr,
