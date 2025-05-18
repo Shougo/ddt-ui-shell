@@ -888,7 +888,7 @@ export class Ui extends BaseUi<Params> {
               const bold = annotation.csi.sgr?.bold;
               const underline = annotation.csi.sgr?.underline;
 
-              if (annotation.csi.cha == 0) {
+              if (annotation.csi.cha == 0 || annotation.csi.el === 0) {
                 // Overwrite current line
                 overwrite = true;
 
