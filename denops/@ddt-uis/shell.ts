@@ -887,9 +887,18 @@ export class Ui extends BaseUi<Params> {
             );
           }
 
+          type ANSIHighlight = {
+            highlight: string;
+            name: string;
+            priority: number;
+            col: number;
+            length: number;
+          };
+
           // NOTE: Use batch to optimize.
           await batch(denops, async (denops: Denops) => {
             let overwrite = false;
+            let currentHighlights: ANSIHighlight[] = [];
             for (const annotation of calculateLengths(annotations)) {
               const foreground = annotation.csi.sgr?.foreground;
               const background = annotation.csi.sgr?.background;
@@ -913,73 +922,58 @@ export class Ui extends BaseUi<Params> {
                 is.Number(background) && background > 0 && background < 16 &&
                 uiParams.ansiColorHighlights.bgs
               ) {
-                denops.call(
-                  "ddt#ui#shell#_highlight",
-                  uiParams.ansiColorHighlights.bgs[background],
-                  `ANSIColorBG${background}`,
-                  5,
-                  this.#bufNr,
-                  lastLineNr,
-                  annotation.offset + 1,
-                  annotation.length,
-                );
+                currentHighlights.push({
+                  highlight: uiParams.ansiColorHighlights.bgs[background],
+                  name: `ANSIColorBG${background}`,
+                  priority: 5,
+                  col: annotation.offset + 1,
+                  length: annotation.length,
+                });
               }
               if (
                 is.Boolean(bold) && uiParams.ansiColorHighlights.bold
               ) {
-                denops.call(
-                  "ddt#ui#shell#_highlight",
-                  uiParams.ansiColorHighlights.bold,
-                  `ANSIColorBold`,
-                  100,
-                  this.#bufNr,
-                  lastLineNr,
-                  annotation.offset + 1,
-                  annotation.length,
-                );
+                currentHighlights.push({
+                  highlight: uiParams.ansiColorHighlights.bold,
+                  name: `ANSIColorBold`,
+                  priority: 100,
+                  col: annotation.offset + 1,
+                  length: annotation.length,
+                });
               }
               if (
                 is.Number(foreground) && foreground > 0 && foreground < 16 &&
                 uiParams.ansiColorHighlights.fgs
               ) {
-                denops.call(
-                  "ddt#ui#shell#_highlight",
-                  uiParams.ansiColorHighlights.fgs[foreground],
-                  `ANSIColorFG${foreground}`,
-                  10,
-                  this.#bufNr,
-                  lastLineNr,
-                  annotation.offset + 1,
-                  annotation.length,
-                );
+                currentHighlights.push({
+                  highlight: uiParams.ansiColorHighlights.fgs[foreground],
+                  name: `ANSIColorFG${foreground}`,
+                  priority: 10,
+                  col: annotation.offset + 1,
+                  length: annotation.length,
+                });
               }
               if (
                 is.Boolean(italic) && uiParams.ansiColorHighlights.italic
               ) {
-                denops.call(
-                  "ddt#ui#shell#_highlight",
-                  uiParams.ansiColorHighlights.italic,
-                  `ANSIColorItalic`,
-                  100,
-                  this.#bufNr,
-                  lastLineNr,
-                  annotation.offset + 1,
-                  annotation.length,
-                );
+                currentHighlights.push({
+                  highlight: uiParams.ansiColorHighlights.italic,
+                  name: `ANSIColorItalic`,
+                  priority: 100,
+                  col: annotation.offset + 1,
+                  length: annotation.length,
+                });
               }
               if (
                 is.Boolean(underline) && uiParams.ansiColorHighlights.underline
               ) {
-                denops.call(
-                  "ddt#ui#shell#_highlight",
-                  uiParams.ansiColorHighlights.underline,
-                  `ANSIColorUnderline`,
-                  100,
-                  this.#bufNr,
-                  lastLineNr,
-                  annotation.offset + 1,
-                  annotation.length,
-                );
+                currentHighlights.push({
+                  highlight: uiParams.ansiColorHighlights.underline,
+                  name: `ANSIColorUnderline`,
+                  priority: 100,
+                  col: annotation.offset + 1,
+                  length: annotation.length,
+                });
               }
             }
 
@@ -991,6 +985,19 @@ export class Ui extends BaseUi<Params> {
                 trimmed,
               );
               lastLineNr += 1;
+            }
+
+            for (const highlight of currentHighlights) {
+              denops.call(
+                "ddt#ui#shell#_highlight",
+                highlight.highlight,
+                highlight.name,
+                highlight.priority,
+                this.#bufNr,
+                lastLineNr,
+                highlight.col,
+                highlight.length,
+              );
             }
 
             this.#updatePrompt(denops, trimmed);
