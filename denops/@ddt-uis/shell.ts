@@ -878,6 +878,15 @@ export class Ui extends BaseUi<Params> {
           );
           let lastLineNr = await fn.line(denops, "$");
 
+          if (lastLine.length === 0) {
+            await fn.setbufline(
+              denops,
+              this.#bufNr,
+              "$",
+              trimmed,
+            );
+          }
+
           // NOTE: Use batch to optimize.
           await batch(denops, async (denops: Denops) => {
             let overwrite = false;
@@ -974,14 +983,7 @@ export class Ui extends BaseUi<Params> {
               }
             }
 
-            if (lastLine.length === 0) {
-              await fn.setbufline(
-                denops,
-                this.#bufNr,
-                "$",
-                trimmed,
-              );
-            } else if (!overwrite) {
+            if (!overwrite) {
               await fn.appendbufline(
                 denops,
                 this.#bufNr,
