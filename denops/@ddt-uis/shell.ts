@@ -24,7 +24,7 @@ import { Pty } from "jsr:@sigma/pty-ffi@~0.36.0";
 import {
   type Annotation,
   trimAndParse,
-} from "jsr:@lambdalisue/ansi-escape-code@~1.0.3";
+} from "jsr:@lambdalisue/ansi-escape-code@~1.0.4";
 
 //import { parse } from 'jsr:@fcrozatier/monarch@~2.3.2';
 
@@ -871,6 +871,7 @@ export class Ui extends BaseUi<Params> {
           const [trimmed, annotations] = trimAndParse(line);
           //console.log(trimmed);
           //console.log(calculateLengths(annotations));
+          //console.log(Array.from(transformAnnotations(trimmed, annotations)));
 
           const lastLine = (await this.#getBufLine(denops, "$")).replaceAll(
             /\d+/g,
@@ -1270,6 +1271,23 @@ function calculateLengths(annotations: Annotation[]): AnnotationWithLength[] {
   return result;
 }
 
+function* transformAnnotations(trimmed: string, annotations: Annotation[]) {
+  let offset = 0;
+  for (const annotation of annotations) {
+    if (offset < annotation.offset) {
+      yield { text: trimmed.slice(offset, annotation.offset) };
+      offset = annotation.offset;
+    }
+    yield {
+      raw: annotation.raw,
+      csi: annotation.csi,
+    };
+  }
+  if (offset < trimmed.length) {
+    yield { text: trimmed.slice(offset) };
+  }
+}
+
 Deno.test("splitArgs should split a simple command", () => {
   assertEquals(splitArgs("ls -la"), ["ls", "-la"]);
 });
@@ -1341,4 +1359,30 @@ Deno.test("calculateLengths - Multiple annotations with gaps", () => {
 
   const result = calculateLengths(annotations);
   assertEquals(result, expected);
+});
+
+Deno.test("transformAnnotations()", () => {
+  const [trimmed, annotations] = trimAndParse(
+    "Hello\x1b[2KWorld\x1b[2KGoodbye",
+  );
+
+  assertEquals(trimmed, "HelloWorldGoodbye");
+  assertEquals(annotations, [
+    { offset: 5, raw: "\x1b[2K", csi: { el: 2 } },
+    { offset: 10, raw: "\x1b[2K", csi: { el: 2 } },
+  ]);
+
+  assertEquals(Array.from(transformAnnotations(trimmed, annotations)), [
+    { text: "Hello" },
+    {
+      csi: { el: 2 },
+      raw: "\x1b[2K",
+    },
+    { text: "World" },
+    {
+      csi: { el: 2 },
+      raw: "\x1b[2K",
+    },
+    { text: "Goodbye" },
+  ]);
 });
