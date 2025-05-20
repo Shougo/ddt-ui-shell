@@ -873,11 +873,7 @@ export class Ui extends BaseUi<Params> {
           //console.log(calculateLengths(annotations));
           //console.log(Array.from(transformAnnotations(trimmed, annotations)));
 
-          const lastLine = (await this.#getBufLine(denops, "$")).replaceAll(
-            /\d+/g,
-            "0",
-          );
-          let lastLineNr = await fn.line(denops, "$");
+          let currentLineNr = await fn.line(denops, "$");
 
           type ANSIHighlight = {
             highlight: string;
@@ -887,82 +883,83 @@ export class Ui extends BaseUi<Params> {
             length: number;
           };
 
-          // NOTE: Use batch to optimize.
-          await batch(denops, async (denops: Denops) => {
-            let overwrite = false;
-            const currentHighlights: ANSIHighlight[] = [];
-            for (const annotation of calculateLengths(annotations)) {
-              const foreground = annotation.csi.sgr?.foreground;
-              const background = annotation.csi.sgr?.background;
-              const italic = annotation.csi.sgr?.italic;
-              const bold = annotation.csi.sgr?.bold;
-              const underline = annotation.csi.sgr?.underline;
+          let overwrite = (await this.#getBufLine(denops, "$")).length === 0;
 
-              if (annotation.csi?.cha === 0 || annotation.csi?.el === 0) {
-                // Overwrite current line
-                overwrite = true;
-              }
+          const currentHighlights: ANSIHighlight[] = [];
+          for (const annotation of calculateLengths(annotations)) {
+            const foreground = annotation.csi.sgr?.foreground;
+            const background = annotation.csi.sgr?.background;
+            const italic = annotation.csi.sgr?.italic;
+            const bold = annotation.csi.sgr?.bold;
+            const underline = annotation.csi.sgr?.underline;
 
-              if (
-                is.Number(background) && background > 0 && background < 16 &&
-                uiParams.ansiColorHighlights.bgs
-              ) {
-                currentHighlights.push({
-                  highlight: uiParams.ansiColorHighlights.bgs[background],
-                  name: `ANSIColorBG${background}`,
-                  priority: 5,
-                  col: annotation.offset + 1,
-                  length: annotation.length,
-                });
-              }
-              if (
-                is.Boolean(bold) && uiParams.ansiColorHighlights.bold
-              ) {
-                currentHighlights.push({
-                  highlight: uiParams.ansiColorHighlights.bold,
-                  name: `ANSIColorBold`,
-                  priority: 100,
-                  col: annotation.offset + 1,
-                  length: annotation.length,
-                });
-              }
-              if (
-                is.Number(foreground) && foreground > 0 && foreground < 16 &&
-                uiParams.ansiColorHighlights.fgs
-              ) {
-                currentHighlights.push({
-                  highlight: uiParams.ansiColorHighlights.fgs[foreground],
-                  name: `ANSIColorFG${foreground}`,
-                  priority: 10,
-                  col: annotation.offset + 1,
-                  length: annotation.length,
-                });
-              }
-              if (
-                is.Boolean(italic) && uiParams.ansiColorHighlights.italic
-              ) {
-                currentHighlights.push({
-                  highlight: uiParams.ansiColorHighlights.italic,
-                  name: `ANSIColorItalic`,
-                  priority: 100,
-                  col: annotation.offset + 1,
-                  length: annotation.length,
-                });
-              }
-              if (
-                is.Boolean(underline) && uiParams.ansiColorHighlights.underline
-              ) {
-                currentHighlights.push({
-                  highlight: uiParams.ansiColorHighlights.underline,
-                  name: `ANSIColorUnderline`,
-                  priority: 100,
-                  col: annotation.offset + 1,
-                  length: annotation.length,
-                });
-              }
+            if (annotation.csi?.cha === 0 || annotation.csi?.el === 0) {
+              // Overwrite current line
+              overwrite = true;
             }
 
-            if (overwrite || lastLine.length === 0) {
+            if (
+              is.Number(background) && background > 0 && background < 16 &&
+              uiParams.ansiColorHighlights.bgs
+            ) {
+              currentHighlights.push({
+                highlight: uiParams.ansiColorHighlights.bgs[background],
+                name: `ANSIColorBG${background}`,
+                priority: 5,
+                col: annotation.offset + 1,
+                length: annotation.length,
+              });
+            }
+            if (
+              is.Boolean(bold) && uiParams.ansiColorHighlights.bold
+            ) {
+              currentHighlights.push({
+                highlight: uiParams.ansiColorHighlights.bold,
+                name: `ANSIColorBold`,
+                priority: 100,
+                col: annotation.offset + 1,
+                length: annotation.length,
+              });
+            }
+            if (
+              is.Number(foreground) && foreground > 0 && foreground < 16 &&
+              uiParams.ansiColorHighlights.fgs
+            ) {
+              currentHighlights.push({
+                highlight: uiParams.ansiColorHighlights.fgs[foreground],
+                name: `ANSIColorFG${foreground}`,
+                priority: 10,
+                col: annotation.offset + 1,
+                length: annotation.length,
+              });
+            }
+            if (
+              is.Boolean(italic) && uiParams.ansiColorHighlights.italic
+            ) {
+              currentHighlights.push({
+                highlight: uiParams.ansiColorHighlights.italic,
+                name: `ANSIColorItalic`,
+                priority: 100,
+                col: annotation.offset + 1,
+                length: annotation.length,
+              });
+            }
+            if (
+              is.Boolean(underline) && uiParams.ansiColorHighlights.underline
+            ) {
+              currentHighlights.push({
+                highlight: uiParams.ansiColorHighlights.underline,
+                name: `ANSIColorUnderline`,
+                priority: 100,
+                col: annotation.offset + 1,
+                length: annotation.length,
+              });
+            }
+          }
+
+          // NOTE: Use batch to optimize.
+          await batch(denops, async (denops: Denops) => {
+            if (overwrite) {
               await fn.setbufline(
                 denops,
                 this.#bufNr,
@@ -976,7 +973,7 @@ export class Ui extends BaseUi<Params> {
                 "$",
                 trimmed,
               );
-              lastLineNr += 1;
+              currentLineNr += 1;
             }
 
             for (const highlight of currentHighlights) {
@@ -986,14 +983,14 @@ export class Ui extends BaseUi<Params> {
                 highlight.name,
                 highlight.priority,
                 this.#bufNr,
-                lastLineNr,
+                currentLineNr,
                 highlight.col,
                 highlight.length,
               );
             }
-
-            this.#updatePrompt(denops, trimmed);
           });
+
+          this.#updatePrompt(denops, await this.#getBufLine(denops, "$"));
         }
 
         if (passwordRegex.exec(data)) {
