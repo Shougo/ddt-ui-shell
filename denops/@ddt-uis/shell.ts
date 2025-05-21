@@ -335,7 +335,7 @@ export class Ui extends BaseUi<Params> {
           return;
         }
 
-        const lastLine = await this.#getBufLine(args.denops, "$");
+        const lastLine = await fn.getbufoneline(args.denops, this.#bufNr, "$");
         if (lastLine === args.uiParams.prompt + " ") {
           // Redraw the prompt
           await this.#newPrompt(args.denops, args.uiParams);
@@ -501,7 +501,7 @@ export class Ui extends BaseUi<Params> {
 
     await denops.cmd(`buffer ${this.#bufNr}`);
 
-    const lastLine = await this.#getBufLine(denops, "$");
+    const lastLine = await fn.getbufoneline(denops, this.#bufNr, "$");
     if (this.#cwd !== "" && newCwd !== this.#cwd) {
       // Current directory is changed
       await this.#newCdPrompt(denops, params, newCwd);
@@ -563,11 +563,6 @@ export class Ui extends BaseUi<Params> {
     await this.#newPrompt(denops, params);
   }
 
-  async #getBufLine(denops: Denops, lineNr: "$" | number): Promise<string> {
-    const bufLines = await fn.getbufline(denops, this.#bufNr, lineNr);
-    return bufLines.length === 0 ? "" : bufLines[0];
-  }
-
   async #newPrompt(denops: Denops, params: Params, commandLine: string = "") {
     if (this.#pty) {
       this.#pty.close();
@@ -583,12 +578,12 @@ export class Ui extends BaseUi<Params> {
     promptLines = promptLines.concat(userPrompts);
     promptLines.push(`${params.prompt} ${commandLine}`);
 
-    const lastLine = await this.#getBufLine(denops, "$");
+    const lastLine = await fn.getbufoneline(denops, this.#bufNr, "$");
     if (lastLine === params.prompt + " ") {
       const userPromptPos = await searchUserPrompt(
         denops,
         params.userPromptPattern,
-        await fn.line(denops, "$") - 1,
+        (await fn.getbufline(denops, this.#bufNr, 1, "$")).length - 1,
       );
 
       if (userPromptPos > 0) {
@@ -604,16 +599,17 @@ export class Ui extends BaseUi<Params> {
 
     if (lastLine.length === 0 || lastLine === params.prompt + " ") {
       // Overwrite current prompt
-      await fn.setline(denops, "$", promptLines);
+      await fn.setbufline(denops, this.#bufNr, "$", promptLines);
     } else {
-      await fn.append(denops, "$", promptLines);
+      await fn.appendbufline(denops, this.#bufNr, "$", promptLines);
     }
 
     await fn.setbufvar(denops, this.#bufNr, "&modified", false);
 
     // Highlight prompts
     const promises = [];
-    const promptLineNr = await fn.line(denops, "$");
+    const promptLineNr =
+      (await fn.getbufline(denops, this.#bufNr, 1, "$")).length;
     let userPromptLine = promptLineNr - 1;
     for (const _userPrompt of userPrompts) {
       promises.push(
@@ -858,22 +854,39 @@ export class Ui extends BaseUi<Params> {
         cwd: this.#cwd,
       });
 
-      await fn.appendbufline(denops, this.#bufNr, "$", "");
       await this.#moveCursorLast(denops);
-      this.#updatePrompt(denops, await this.#getBufLine(denops, "$"));
 
       const passwordRegex = new RegExp(uiParams.passwordPattern);
+
+      let currentLineNr =
+        (await fn.getbufline(denops, this.#bufNr, 1, "$")).length;
+
+      const promptLineNr = currentLineNr;
 
       for await (const data of this.#pty.readable) {
         for (
           const line of data.split(/\r|\n/).filter((str) => str.length > 0)
         ) {
+          await fn.appendbufline(
+            denops,
+            this.#bufNr,
+            "$",
+            "",
+          );
+
           const [trimmed, annotations] = trimAndParse(line);
           //console.log(trimmed);
-          //console.log(calculateLengths(annotations));
           //console.log(Array.from(transformAnnotations(trimmed, annotations)));
 
-          let currentLineNr = await fn.line(denops, "$");
+          currentLineNr += 1;
+          let currentCol = 1;
+          let currentText = await fn.getbufoneline(denops, this.#bufNr, "$");
+
+          type CurrentHighlight = {
+            highlight: string;
+            name: string;
+            priority: number;
+          };
 
           type ANSIHighlight = {
             highlight: string;
@@ -883,19 +896,30 @@ export class Ui extends BaseUi<Params> {
             length: number;
           };
 
-          let overwrite = (await this.#getBufLine(denops, "$")).length === 0;
+          const currentHighlights: CurrentHighlight[] = [];
+          const ansiHighlights: ANSIHighlight[] = [];
 
-          const currentHighlights: ANSIHighlight[] = [];
-          for (const annotation of calculateLengths(annotations)) {
-            const foreground = annotation.csi.sgr?.foreground;
-            const background = annotation.csi.sgr?.background;
-            const italic = annotation.csi.sgr?.italic;
-            const bold = annotation.csi.sgr?.bold;
-            const underline = annotation.csi.sgr?.underline;
+          let overwrite = false;
 
-            if (annotation.csi?.cha === 0 || annotation.csi?.el === 0) {
+          for (const annotation of transformAnnotations(trimmed, annotations)) {
+            const foreground = annotation.csi?.sgr?.foreground;
+            const background = annotation.csi?.sgr?.background;
+            const italic = annotation.csi?.sgr?.italic;
+            const bold = annotation.csi?.sgr?.bold;
+            const underline = annotation.csi?.sgr?.underline;
+
+            if (
+              (is.Number(annotation.csi?.cha) && annotation.csi?.cha === 0) ||
+              (is.Number(annotation.csi?.el) && annotation.csi?.el > 0) ||
+              (is.Number(annotation.csi?.ed) && annotation.csi?.ed > 0)
+            ) {
               // Overwrite current line
               overwrite = true;
+            }
+
+            if (annotation.csi?.sgr?.reset) {
+              // Reset colors.
+              currentHighlights.length = 0;
             }
 
             if (
@@ -906,8 +930,6 @@ export class Ui extends BaseUi<Params> {
                 highlight: uiParams.ansiColorHighlights.bgs[background],
                 name: `ANSIColorBG${background}`,
                 priority: 5,
-                col: annotation.offset + 1,
-                length: annotation.length,
               });
             }
             if (
@@ -917,8 +939,6 @@ export class Ui extends BaseUi<Params> {
                 highlight: uiParams.ansiColorHighlights.bold,
                 name: `ANSIColorBold`,
                 priority: 100,
-                col: annotation.offset + 1,
-                length: annotation.length,
               });
             }
             if (
@@ -929,8 +949,6 @@ export class Ui extends BaseUi<Params> {
                 highlight: uiParams.ansiColorHighlights.fgs[foreground],
                 name: `ANSIColorFG${foreground}`,
                 priority: 10,
-                col: annotation.offset + 1,
-                length: annotation.length,
               });
             }
             if (
@@ -940,8 +958,6 @@ export class Ui extends BaseUi<Params> {
                 highlight: uiParams.ansiColorHighlights.italic,
                 name: `ANSIColorItalic`,
                 priority: 100,
-                col: annotation.offset + 1,
-                length: annotation.length,
               });
             }
             if (
@@ -951,33 +967,49 @@ export class Ui extends BaseUi<Params> {
                 highlight: uiParams.ansiColorHighlights.underline,
                 name: `ANSIColorUnderline`,
                 priority: 100,
-                col: annotation.offset + 1,
-                length: annotation.length,
               });
+            }
+
+            if (annotation.text) {
+              if (overwrite) {
+                currentText = annotation.text;
+              } else {
+                currentText += annotation.text;
+              }
+
+              // Add highlights
+              for (const highlight of currentHighlights) {
+                ansiHighlights.push({
+                  ...highlight,
+                  col: currentCol,
+                  length: annotation.text.length,
+                });
+              }
+
+              currentCol = currentText.length + 1;
             }
           }
 
-          // NOTE: Use batch to optimize.
           await batch(denops, async (denops: Denops) => {
-            if (overwrite) {
-              await fn.setbufline(
+            if (overwrite && currentLineNr > promptLineNr + 1) {
+              // Remove previous line
+              await fn.deletebufline(
                 denops,
                 this.#bufNr,
-                "$",
-                trimmed,
+                currentLineNr,
               );
-            } else {
-              await fn.appendbufline(
-                denops,
-                this.#bufNr,
-                "$",
-                trimmed,
-              );
-              currentLineNr += 1;
+              currentLineNr -= 1;
             }
 
-            for (const highlight of currentHighlights) {
-              denops.call(
+            await fn.setbufline(
+              denops,
+              this.#bufNr,
+              currentLineNr,
+              currentText,
+            );
+
+            for (const highlight of ansiHighlights) {
+              await denops.call(
                 "ddt#ui#shell#_highlight",
                 highlight.highlight,
                 highlight.name,
@@ -990,7 +1022,7 @@ export class Ui extends BaseUi<Params> {
             }
           });
 
-          this.#updatePrompt(denops, await this.#getBufLine(denops, "$"));
+          this.#updatePrompt(denops, currentText);
         }
 
         if (passwordRegex.exec(data)) {
@@ -1245,29 +1277,6 @@ async function expandDirectory(
   return null;
 }
 
-interface AnnotationWithLength extends Annotation {
-  length: number;
-}
-
-function calculateLengths(annotations: Annotation[]): AnnotationWithLength[] {
-  const result: AnnotationWithLength[] = [];
-
-  for (let i = 0; i < annotations.length; i++) {
-    const current = annotations[i];
-    const next = annotations[i + 1];
-
-    // Calculate length based on the difference between current and next offset
-    const length = next ? next.offset - current.offset : 0;
-
-    result.push({
-      ...current,
-      length,
-    });
-  }
-
-  return result;
-}
-
 function* transformAnnotations(trimmed: string, annotations: Annotation[]) {
   let offset = 0;
   for (const annotation of annotations) {
@@ -1303,59 +1312,6 @@ Deno.test("splitArgs should handle multiple spaces", () => {
 
 Deno.test("splitArgs should handle empty input", () => {
   assertEquals(splitArgs(""), []);
-});
-
-Deno.test("calculateLengths - Basic case", () => {
-  const annotations: Annotation[] = [
-    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } } },
-    { offset: 2, raw: "\x1b[30m", csi: { sgr: { foreground: 0 } } },
-    { offset: 4, raw: "\x1b[31m", csi: { sgr: { foreground: 1 } } },
-    { offset: 5, raw: "\x1b[m", csi: { sgr: { reset: true } } },
-  ];
-
-  const expected: AnnotationWithLength[] = [
-    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } }, length: 2 },
-    { offset: 2, raw: "\x1b[30m", csi: { sgr: { foreground: 0 } }, length: 2 },
-    { offset: 4, raw: "\x1b[31m", csi: { sgr: { foreground: 1 } }, length: 1 },
-    { offset: 5, raw: "\x1b[m", csi: { sgr: { reset: true } }, length: 0 },
-  ];
-
-  const result = calculateLengths(annotations);
-  assertEquals(result, expected);
-});
-
-Deno.test("calculateLengths - Single annotation", () => {
-  const annotations: Annotation[] = [
-    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } } },
-  ];
-
-  const expected: AnnotationWithLength[] = [
-    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } }, length: 0 },
-  ];
-
-  const result = calculateLengths(annotations);
-  assertEquals(result, expected);
-});
-
-Deno.test("calculateLengths - Empty annotations", () => {
-  assertEquals(calculateLengths([]), []);
-});
-
-Deno.test("calculateLengths - Multiple annotations with gaps", () => {
-  const annotations: Annotation[] = [
-    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } } },
-    { offset: 5, raw: "\x1b[30m", csi: { sgr: { foreground: 0 } } },
-    { offset: 10, raw: "\x1b[31m", csi: { sgr: { foreground: 1 } } },
-  ];
-
-  const expected: AnnotationWithLength[] = [
-    { offset: 0, raw: "\x1b[1m", csi: { sgr: { bold: true } }, length: 5 },
-    { offset: 5, raw: "\x1b[30m", csi: { sgr: { foreground: 0 } }, length: 5 },
-    { offset: 10, raw: "\x1b[31m", csi: { sgr: { foreground: 1 } }, length: 0 },
-  ];
-
-  const result = calculateLengths(annotations);
-  assertEquals(result, expected);
 });
 
 Deno.test("transformAnnotations()", () => {
