@@ -875,8 +875,6 @@ export class Ui extends BaseUi<Params> {
           );
 
           const [trimmed, annotations] = trimAndParse(line);
-          //console.log(trimmed);
-          //console.log(Array.from(transformAnnotations(trimmed, annotations)));
 
           currentLineNr += 1;
           let currentCol = 1;
@@ -902,6 +900,8 @@ export class Ui extends BaseUi<Params> {
           let overwrite = false;
 
           for (const annotation of transformAnnotations(trimmed, annotations)) {
+            //console.log(annotation);
+
             const foreground = annotation.csi?.sgr?.foreground;
             const background = annotation.csi?.sgr?.background;
             const italic = annotation.csi?.sgr?.italic;
@@ -910,8 +910,8 @@ export class Ui extends BaseUi<Params> {
 
             if (
               (is.Number(annotation.csi?.cha) && annotation.csi?.cha === 0) ||
-              (is.Number(annotation.csi?.el) && annotation.csi?.el > 0) ||
-              (is.Number(annotation.csi?.ed) && annotation.csi?.ed > 0)
+              (is.Number(annotation.csi?.el) && annotation.csi?.el >= 0) ||
+              (is.Number(annotation.csi?.ed) && annotation.csi?.ed >= 0)
             ) {
               // Overwrite current line
               overwrite = true;
