@@ -112,7 +112,6 @@ export class Ui extends BaseUi<Params> {
       : args.uiParams.cwd;
     const stat = await safeStat(cwd);
     if (!stat || !stat.isDirectory) {
-      // TODO: Create the directory.
       const result = await fn.confirm(
         args.denops,
         `${cwd} is not directory.  Create?`,
@@ -1036,11 +1035,7 @@ export class Ui extends BaseUi<Params> {
           }
         } else if (await fn.bufnr(denops) === this.#bufNr) {
           // NOTE: Move the cursor to view output.
-          await fn.cursor(
-            denops,
-            await fn.line(denops, "$"),
-            await fn.col(denops, "$"),
-          );
+          await this.#moveCursorLast(denops);
         } else {
           // NOTE: It is not ddt-ui-shell buffer.
           await denops.cmd("stopinsert");
