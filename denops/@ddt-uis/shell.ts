@@ -1033,7 +1033,9 @@ export class Ui extends BaseUi<Params> {
           if (secret.length > 0) {
             this.#pty.write(`${secret}\n`);
           }
-        } else if (await fn.bufnr(denops) === this.#bufNr) {
+        }
+
+        if (await fn.bufnr(denops) === this.#bufNr) {
           // NOTE: Move the cursor to view output.
           await this.#moveCursorLast(denops);
         } else {
