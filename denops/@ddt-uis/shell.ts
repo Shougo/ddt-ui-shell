@@ -911,7 +911,8 @@ export class Ui extends BaseUi<Params> {
               (is.Number(annotation.csi?.cha) && annotation.csi?.cha === 0) ||
               (is.Number(annotation.csi?.el) && annotation.csi?.el >= 0) ||
               (is.Number(annotation.csi?.ed) && annotation.csi?.ed >= 0) ||
-              is.String(annotation.text) && annotation.text.match(/\s\d+%/)
+              (is.String(annotation.text) && annotation.text.match(/\s\d+%/) &&
+                currentText.match(/\s\d+%/))
             ) {
               // Overwrite current line
               overwrite = true;
