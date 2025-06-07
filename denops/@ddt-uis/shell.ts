@@ -864,7 +864,7 @@ export class Ui extends BaseUi<Params> {
 
       for await (const data of this.#pty.readable) {
         for (
-          const line of data.split(/\r|\n/).filter((str) => str.length > 0)
+          const line of data.split(/\n/).filter((str) => str.length > 0)
         ) {
           await fn.appendbufline(
             denops,
@@ -896,7 +896,7 @@ export class Ui extends BaseUi<Params> {
           const currentHighlights: CurrentHighlight[] = [];
           const ansiHighlights: ANSIHighlight[] = [];
 
-          let overwrite = false;
+          let overwrite = line.startsWith("\r");
 
           for (const annotation of transformAnnotations(trimmed, annotations)) {
             //console.log(annotation);
@@ -908,13 +908,19 @@ export class Ui extends BaseUi<Params> {
             const underline = annotation.csi?.sgr?.underline;
 
             if (
-              (is.Number(annotation.csi?.cha) && annotation.csi?.cha === 0) ||
+              (is.Number(annotation.csi?.cha) && annotation.csi?.cha >= 0) ||
               (is.Number(annotation.csi?.el) && annotation.csi?.el >= 0) ||
               (is.Number(annotation.csi?.ed) && annotation.csi?.ed >= 0) ||
               is.String(annotation.text) && annotation.text.match(/\s\d+%/)
             ) {
               // Overwrite current line
               overwrite = true;
+
+            }
+
+            if (is.String(annotation.text)) {
+              // Replace CR
+              annotation.text = annotation.text.replace(/\r/, "");
             }
 
             if (annotation.csi?.sgr?.reset) {
