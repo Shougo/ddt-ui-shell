@@ -863,172 +863,182 @@ export class Ui extends BaseUi<Params> {
       const promptLineNr = currentLineNr;
 
       for await (const data of this.#pty.readable) {
-        for (
-          const line of data.split(/\n/).filter((str) => str.length > 0)
-        ) {
-          await fn.appendbufline(
-            denops,
-            this.#bufNr,
-            "$",
-            "",
-          );
+        for (const line of data.split(/\n/)) {
+          const parts = line.split(/(\r)/).reduce((acc: string[], cur) => {
+            if (cur === "\r" && acc.length > 0) {
+              acc[acc.length - 1] += cur;
+            } else {
+              acc.push(cur);
+            }
+            return acc;
+          }, []).filter((str) => str.length > 0);
 
-          const [trimmed, annotations] = trimAndParse(line);
+          for (const part of parts) {
+            await fn.appendbufline(
+              denops,
+              this.#bufNr,
+              "$",
+              "",
+            );
 
-          currentLineNr += 1;
-          let currentCol = 1;
-          let currentText = await fn.getbufoneline(denops, this.#bufNr, "$");
+            const [trimmed, annotations] = trimAndParse(part);
 
-          type CurrentHighlight = {
-            highlight: string;
-            name: string;
-            priority: number;
-          };
+            currentLineNr += 1;
+            let currentCol = 1;
+            let currentText = await fn.getbufoneline(denops, this.#bufNr, "$");
 
-          type ANSIHighlight = {
-            highlight: string;
-            name: string;
-            priority: number;
-            col: number;
-            length: number;
-          };
+            type CurrentHighlight = {
+              highlight: string;
+              name: string;
+              priority: number;
+            };
 
-          const currentHighlights: CurrentHighlight[] = [];
-          const ansiHighlights: ANSIHighlight[] = [];
+            type ANSIHighlight = {
+              highlight: string;
+              name: string;
+              priority: number;
+              col: number;
+              length: number;
+            };
 
-          let overwrite = line.includes("\r") && !line.endsWith("\r");
+            const currentHighlights: CurrentHighlight[] = [];
+            const ansiHighlights: ANSIHighlight[] = [];
 
-          for (const annotation of transformAnnotations(trimmed, annotations)) {
-            //console.log(annotation);
+            let overwrite = line.startsWith("\r");
 
-            const foreground = annotation.csi?.sgr?.foreground;
-            const background = annotation.csi?.sgr?.background;
-            const italic = annotation.csi?.sgr?.italic;
-            const bold = annotation.csi?.sgr?.bold;
-            const underline = annotation.csi?.sgr?.underline;
-
-            if (
-              (is.Number(annotation.csi?.cha) && annotation.csi?.cha >= 0) ||
-              (is.Number(annotation.csi?.el) && annotation.csi?.el >= 0) ||
-              (is.Number(annotation.csi?.ed) && annotation.csi?.ed >= 0) ||
-              is.String(annotation.text) && annotation.text.match(/\s\d+%/)
+            for (
+              const annotation of transformAnnotations(trimmed, annotations)
             ) {
-              // Overwrite current line
-              overwrite = true;
+              //console.log(annotation);
 
-            }
+              const foreground = annotation.csi?.sgr?.foreground;
+              const background = annotation.csi?.sgr?.background;
+              const italic = annotation.csi?.sgr?.italic;
+              const bold = annotation.csi?.sgr?.bold;
+              const underline = annotation.csi?.sgr?.underline;
 
-            if (is.String(annotation.text)) {
-              // Replace CR
-              annotation.text = annotation.text.replace(/\r/, "");
-            }
-
-            if (annotation.csi?.sgr?.reset) {
-              // Reset colors.
-              currentHighlights.length = 0;
-            }
-
-            if (
-              is.Number(background) && background > 0 && background < 16 &&
-              uiParams.ansiColorHighlights.bgs
-            ) {
-              currentHighlights.push({
-                highlight: uiParams.ansiColorHighlights.bgs[background],
-                name: `ANSIColorBG${background}`,
-                priority: 5,
-              });
-            }
-            if (
-              is.Boolean(bold) && uiParams.ansiColorHighlights.bold
-            ) {
-              currentHighlights.push({
-                highlight: uiParams.ansiColorHighlights.bold,
-                name: `ANSIColorBold`,
-                priority: 100,
-              });
-            }
-            if (
-              is.Number(foreground) && foreground > 0 && foreground < 16 &&
-              uiParams.ansiColorHighlights.fgs
-            ) {
-              currentHighlights.push({
-                highlight: uiParams.ansiColorHighlights.fgs[foreground],
-                name: `ANSIColorFG${foreground}`,
-                priority: 10,
-              });
-            }
-            if (
-              is.Boolean(italic) && uiParams.ansiColorHighlights.italic
-            ) {
-              currentHighlights.push({
-                highlight: uiParams.ansiColorHighlights.italic,
-                name: `ANSIColorItalic`,
-                priority: 100,
-              });
-            }
-            if (
-              is.Boolean(underline) && uiParams.ansiColorHighlights.underline
-            ) {
-              currentHighlights.push({
-                highlight: uiParams.ansiColorHighlights.underline,
-                name: `ANSIColorUnderline`,
-                priority: 100,
-              });
-            }
-
-            if (annotation.text) {
-              if (overwrite) {
-                currentText = annotation.text;
-              } else {
-                currentText += annotation.text;
+              if (
+                (is.Number(annotation.csi?.cha) && annotation.csi?.cha >= 0) ||
+                (is.Number(annotation.csi?.el) && annotation.csi?.el >= 0) ||
+                (is.Number(annotation.csi?.ed) && annotation.csi?.ed >= 0) ||
+                is.String(annotation.text) && annotation.text.match(/\s\d+%/)
+              ) {
+                // Overwrite current line
+                overwrite = true;
               }
 
-              // Add highlights
-              for (const highlight of currentHighlights) {
-                ansiHighlights.push({
-                  ...highlight,
-                  col: currentCol,
-                  length: annotation.text.length,
+              if (is.String(annotation.text)) {
+                // Replace CR
+                annotation.text = annotation.text.replace(/\r/, "");
+              }
+
+              if (annotation.csi?.sgr?.reset) {
+                // Reset colors.
+                currentHighlights.length = 0;
+              }
+
+              if (
+                is.Number(background) && background > 0 && background < 16 &&
+                uiParams.ansiColorHighlights.bgs
+              ) {
+                currentHighlights.push({
+                  highlight: uiParams.ansiColorHighlights.bgs[background],
+                  name: `ANSIColorBG${background}`,
+                  priority: 5,
+                });
+              }
+              if (
+                is.Boolean(bold) && uiParams.ansiColorHighlights.bold
+              ) {
+                currentHighlights.push({
+                  highlight: uiParams.ansiColorHighlights.bold,
+                  name: `ANSIColorBold`,
+                  priority: 100,
+                });
+              }
+              if (
+                is.Number(foreground) && foreground > 0 && foreground < 16 &&
+                uiParams.ansiColorHighlights.fgs
+              ) {
+                currentHighlights.push({
+                  highlight: uiParams.ansiColorHighlights.fgs[foreground],
+                  name: `ANSIColorFG${foreground}`,
+                  priority: 10,
+                });
+              }
+              if (
+                is.Boolean(italic) && uiParams.ansiColorHighlights.italic
+              ) {
+                currentHighlights.push({
+                  highlight: uiParams.ansiColorHighlights.italic,
+                  name: `ANSIColorItalic`,
+                  priority: 100,
+                });
+              }
+              if (
+                is.Boolean(underline) && uiParams.ansiColorHighlights.underline
+              ) {
+                currentHighlights.push({
+                  highlight: uiParams.ansiColorHighlights.underline,
+                  name: `ANSIColorUnderline`,
+                  priority: 100,
                 });
               }
 
-              currentCol = currentText.length + 1;
-            }
-          }
+              if (annotation.text) {
+                if (overwrite) {
+                  currentText = annotation.text;
+                } else {
+                  currentText += annotation.text;
+                }
 
-          await batch(denops, async (denops: Denops) => {
-            if (overwrite && currentLineNr > promptLineNr + 1) {
-              // Remove previous line
-              await fn.deletebufline(
+                // Add highlights
+                for (const highlight of currentHighlights) {
+                  ansiHighlights.push({
+                    ...highlight,
+                    col: currentCol,
+                    length: annotation.text.length,
+                  });
+                }
+
+                currentCol = currentText.length + 1;
+              }
+            }
+
+            await batch(denops, async (denops: Denops) => {
+              if (overwrite && currentLineNr > promptLineNr + 1) {
+                // Remove previous line
+                await fn.deletebufline(
+                  denops,
+                  this.#bufNr,
+                  currentLineNr,
+                );
+                currentLineNr -= 1;
+              }
+
+              await fn.setbufline(
                 denops,
                 this.#bufNr,
                 currentLineNr,
+                currentText,
               );
-              currentLineNr -= 1;
-            }
 
-            await fn.setbufline(
-              denops,
-              this.#bufNr,
-              currentLineNr,
-              currentText,
-            );
+              for (const highlight of ansiHighlights) {
+                await denops.call(
+                  "ddt#ui#shell#_highlight",
+                  highlight.highlight,
+                  highlight.name,
+                  highlight.priority,
+                  this.#bufNr,
+                  currentLineNr,
+                  highlight.col,
+                  highlight.length,
+                );
+              }
+            });
 
-            for (const highlight of ansiHighlights) {
-              await denops.call(
-                "ddt#ui#shell#_highlight",
-                highlight.highlight,
-                highlight.name,
-                highlight.priority,
-                this.#bufNr,
-                currentLineNr,
-                highlight.col,
-                highlight.length,
-              );
-            }
-          });
-
-          this.#updatePrompt(denops, currentText);
+            this.#updatePrompt(denops, currentText);
+          }
         }
 
         if (passwordRegex.exec(data)) {
