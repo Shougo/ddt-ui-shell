@@ -896,7 +896,7 @@ export class Ui extends BaseUi<Params> {
           const currentHighlights: CurrentHighlight[] = [];
           const ansiHighlights: ANSIHighlight[] = [];
 
-          let overwrite = line.startsWith("\r");
+          let overwrite = line.includes("\r") && !line.endsWith("\r");
 
           for (const annotation of transformAnnotations(trimmed, annotations)) {
             //console.log(annotation);
