@@ -871,7 +871,7 @@ export class Ui extends BaseUi<Params> {
               acc.push(cur);
             }
             return acc;
-          }, []).filter((str) => str.length > 0);
+          }, []).filter((str) => str.length > 0 && str !== "\r");
 
           for (const part of parts) {
             await fn.appendbufline(
