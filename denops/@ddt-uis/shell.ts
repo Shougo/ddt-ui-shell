@@ -99,6 +99,7 @@ export class Ui extends BaseUi<Params> {
   #cwd = "";
   #prompt = "";
   #pty: Pty | null = null;
+  #startTime: number | null = null;
 
   override async redraw(args: {
     denops: Denops;
@@ -455,6 +456,30 @@ export class Ui extends BaseUi<Params> {
         ) {
           await fn.append(args.denops, "$", history);
         }
+
+        return {
+          value: 0,
+        };
+      },
+    },
+    time: {
+      description: "Calc execution time",
+      callback: async (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiOptions: UiOptions;
+        uiParams: Params;
+        cmdArgs: string[];
+      }) => {
+        this.#startTime = Date.now();
+
+        await this.#execute(
+          args.denops,
+          args.options,
+          args.uiOptions,
+          args.uiParams,
+          args.cmdArgs.join(" "),
+        );
 
         return {
           value: 0,
@@ -1065,6 +1090,17 @@ export class Ui extends BaseUi<Params> {
       if (this.#pty) {
         this.#pty.close();
         this.#pty = null;
+      }
+
+      if (this.#startTime) {
+        await fn.appendbufline(
+          denops,
+          this.#bufNr,
+          "$",
+          `${Date.now() - this.#startTime} ms`,
+        );
+
+        this.#startTime = null;
       }
 
       await this.#newPrompt(denops, uiParams);

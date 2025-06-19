@@ -263,6 +263,10 @@ cd [{directory}]
 history
 		Print current history list.
 
+                                                   *ddu-ui-shell-builtin-time*
+time {command-line}
+		Print executed time.
+
                                                     *ddu-ui-shell-builtin-vim*
 vim {path}
 		params:
