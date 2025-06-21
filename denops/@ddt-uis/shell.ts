@@ -1059,18 +1059,20 @@ export class Ui extends BaseUi<Params> {
           }
         }
 
-        for (const highlight of ansiHighlights) {
-          await denops.call(
-            "ddt#ui#shell#_highlight",
-            highlight.highlight,
-            highlight.name,
-            highlight.priority,
-            this.#bufNr,
-            highlight.row,
-            highlight.col,
-            highlight.length,
-          );
-        }
+        await batch(denops, async (denops: Denops) => {
+          for (const highlight of ansiHighlights) {
+            await denops.call(
+              "ddt#ui#shell#_highlight",
+              highlight.highlight,
+              highlight.name,
+              highlight.priority,
+              this.#bufNr,
+              highlight.row,
+              highlight.col,
+              highlight.length,
+            );
+          }
+        });
 
         if (await fn.bufnr(denops) === this.#bufNr) {
           // NOTE: Move the cursor to view output.
