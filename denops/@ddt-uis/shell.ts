@@ -1042,22 +1042,10 @@ export class Ui extends BaseUi<Params> {
             } else {
               bufLines.push(currentText);
             }
-
-            this.#updatePrompt(denops, currentText);
           }
         }
 
         await fn.setbufline(denops, this.#bufNr, promptLineNr + 1, bufLines);
-
-        if (passwordRegex.exec(data)) {
-          // NOTE: Move the cursor to make the output more visible.
-          await denops.cmd("normal! zz");
-
-          const secret = await fn.inputsecret(denops, "Password: ");
-          if (secret.length > 0) {
-            this.#pty.write(`${secret}\n`);
-          }
-        }
 
         await batch(denops, async (denops: Denops) => {
           for (const highlight of ansiHighlights) {
@@ -1080,6 +1068,21 @@ export class Ui extends BaseUi<Params> {
         } else {
           // NOTE: It is not ddt-ui-shell buffer.
           await denops.cmd("stopinsert");
+        }
+
+        this.#updatePrompt(
+          denops,
+          await fn.getbufoneline(denops, this.#bufNr, "$"),
+        );
+
+        if (passwordRegex.exec(data)) {
+          // NOTE: Move the cursor to make the output more visible.
+          await denops.cmd("normal! zz");
+
+          const secret = await fn.inputsecret(denops, "Password: ");
+          if (secret.length > 0) {
+            this.#pty.write(`${secret}\n`);
+          }
         }
       }
 
