@@ -888,7 +888,23 @@ export class Ui extends BaseUi<Params> {
       const promptLineNr = currentLineNr;
 
       for await (const data of this.#pty.readable) {
-        for (const line of data.split(/\n/)) {
+        const lines = data.split(/\n/);
+
+        type ANSIHighlight = {
+          highlight: string;
+          name: string;
+          priority: number;
+          row: number;
+          col: number;
+          length: number;
+        };
+
+        const ansiHighlights: ANSIHighlight[] = [];
+
+        // Get all lines.
+        const bufLines: string[] = [];
+
+        for (const line of lines) {
           const parts = line.split(/(\r)/).reduce((acc: string[], cur) => {
             if (cur === "\r" && acc.length > 0) {
               acc[acc.length - 1] += cur;
@@ -899,18 +915,14 @@ export class Ui extends BaseUi<Params> {
           }, []).filter((str) => str.length > 0 && str !== "\r");
 
           for (const part of parts) {
-            await fn.appendbufline(
-              denops,
-              this.#bufNr,
-              "$",
-              "",
-            );
-
             const [trimmed, annotations] = trimAndParse(part);
 
             currentLineNr += 1;
             let currentCol = 1;
-            let currentText = await fn.getbufoneline(denops, this.#bufNr, "$");
+            const currentIndex = currentLineNr - promptLineNr;
+            let currentText = currentIndex < bufLines.length
+              ? bufLines[currentIndex]
+              : "";
 
             type CurrentHighlight = {
               highlight: string;
@@ -918,16 +930,7 @@ export class Ui extends BaseUi<Params> {
               priority: number;
             };
 
-            type ANSIHighlight = {
-              highlight: string;
-              name: string;
-              priority: number;
-              col: number;
-              length: number;
-            };
-
             const currentHighlights: CurrentHighlight[] = [];
-            const ansiHighlights: ANSIHighlight[] = [];
 
             let overwrite = line.startsWith("\r");
 
@@ -1023,6 +1026,7 @@ export class Ui extends BaseUi<Params> {
                 for (const highlight of currentHighlights) {
                   ansiHighlights.push({
                     ...highlight,
+                    row: currentLineNr,
                     col: currentCol,
                     length: annotation.text.length,
                   });
@@ -1032,41 +1036,18 @@ export class Ui extends BaseUi<Params> {
               }
             }
 
-            await batch(denops, async (denops: Denops) => {
-              if (overwrite && currentLineNr > promptLineNr + 1) {
-                // Remove previous line
-                await fn.deletebufline(
-                  denops,
-                  this.#bufNr,
-                  currentLineNr,
-                );
-                currentLineNr -= 1;
-              }
-
-              await fn.setbufline(
-                denops,
-                this.#bufNr,
-                currentLineNr,
-                currentText,
-              );
-
-              for (const highlight of ansiHighlights) {
-                await denops.call(
-                  "ddt#ui#shell#_highlight",
-                  highlight.highlight,
-                  highlight.name,
-                  highlight.priority,
-                  this.#bufNr,
-                  currentLineNr,
-                  highlight.col,
-                  highlight.length,
-                );
-              }
-            });
+            if (overwrite && currentIndex < bufLines.length) {
+              bufLines[currentIndex] = currentText;
+              currentLineNr -= 1;
+            } else {
+              bufLines.push(currentText);
+            }
 
             this.#updatePrompt(denops, currentText);
           }
         }
+
+        await fn.setbufline(denops, this.#bufNr, promptLineNr + 1, bufLines);
 
         if (passwordRegex.exec(data)) {
           // NOTE: Move the cursor to make the output more visible.
@@ -1076,6 +1057,19 @@ export class Ui extends BaseUi<Params> {
           if (secret.length > 0) {
             this.#pty.write(`${secret}\n`);
           }
+        }
+
+        for (const highlight of ansiHighlights) {
+          await denops.call(
+            "ddt#ui#shell#_highlight",
+            highlight.highlight,
+            highlight.name,
+            highlight.priority,
+            this.#bufNr,
+            highlight.row,
+            highlight.col,
+            highlight.length,
+          );
         }
 
         if (await fn.bufnr(denops) === this.#bufNr) {
