@@ -127,7 +127,7 @@ function ddt#ui#shell#_highlight(
   endif
 
   const max_col = getbufoneline(a:bufnr, a:row)->len()
-  if col > max_col
+  if a:col > max_col
     return
   endif
 
