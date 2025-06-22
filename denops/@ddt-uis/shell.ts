@@ -942,7 +942,9 @@ export class Ui extends BaseUi<Params> {
       const bufLines: string[] = [];
 
       for (const line of data.split(/\r*\n/)) {
-        const parts = line.split(/(\r)/).filter((s) => s.length > 0);
+        const parts = line.split(/(\r)/).filter((s) =>
+          s.length > 0 && s !== "\r"
+        );
 
         for (const part of parts) {
           let overwrite = part.startsWith("\r");
