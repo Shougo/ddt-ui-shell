@@ -126,10 +126,12 @@ function ddt#ui#shell#_highlight(
     endif
   endif
 
-  const length =
-        \   a:length ==# 0
-        \ ? getbufoneline(a:bufnr, a:row)->len() - a:col + 1
-        \ : a:length
+  const max_col = getbufoneline(a:bufnr, a:row)->len()
+  if col > max_col
+    return
+  endif
+
+  const length = a:length ==# 0 ? max_col - a:col + 1 : a:length
 
   if has('nvim')
     call nvim_buf_set_extmark(
