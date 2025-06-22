@@ -896,7 +896,7 @@ export class Ui extends BaseUi<Params> {
           await denops.cmd("stopinsert");
         }
 
-        const lines = data.split(/\n/);
+        const lines = data.split(/\r?\n/);
 
         type ANSIHighlight = {
           highlight: string;
@@ -913,17 +913,13 @@ export class Ui extends BaseUi<Params> {
         const bufLines: string[] = [];
 
         for (const line of lines) {
-          const parts = line.split(/(\r)/).reduce((acc: string[], cur) => {
-            if (cur === "\r" && acc.length > 0) {
-              acc[acc.length - 1] += cur;
-            } else {
-              acc.push(cur);
-            }
-            return acc;
-          }, []).filter((str) => str.length > 0 && str !== "\r");
+          const parts = line.split(/(\r)/).filter((s) => s.length > 0);
 
           for (const part of parts) {
-            const [trimmed, annotations] = trimAndParse(part);
+            let overwrite = part.startsWith("\r");
+            const content = part.replace(/^\r/, "");
+
+            const [trimmed, annotations] = trimAndParse(content);
 
             currentLineNr += 1;
             let currentCol = 1;
@@ -939,8 +935,6 @@ export class Ui extends BaseUi<Params> {
             };
 
             const currentHighlights: CurrentHighlight[] = [];
-
-            let overwrite = line.startsWith("\r");
 
             for (
               const annotation of transformAnnotations(trimmed, annotations)
@@ -1044,11 +1038,12 @@ export class Ui extends BaseUi<Params> {
               }
             }
 
-            if (overwrite && currentIndex < bufLines.length) {
-              bufLines[currentIndex] = currentText;
-              currentLineNr -= 1;
+            if (overwrite && bufLines.length > 0) {
+              // Overwrite current line.
+              bufLines[bufLines.length - 1] = trimmed;
             } else {
-              bufLines.push(currentText);
+              // Append new line.
+              bufLines.push(trimmed);
             }
           }
         }
