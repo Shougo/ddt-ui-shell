@@ -888,6 +888,14 @@ export class Ui extends BaseUi<Params> {
       const promptLineNr = currentLineNr;
 
       for await (const data of this.#pty.readable) {
+        if (await fn.bufnr(denops) === this.#bufNr) {
+          // NOTE: Move the cursor to view output.
+          await this.#moveCursorLast(denops);
+        } else {
+          // NOTE: It is not ddt-ui-shell buffer.
+          await denops.cmd("stopinsert");
+        }
+
         const lines = data.split(/\n/);
 
         type ANSIHighlight = {
@@ -1061,14 +1069,6 @@ export class Ui extends BaseUi<Params> {
             );
           }
         });
-
-        if (await fn.bufnr(denops) === this.#bufNr) {
-          // NOTE: Move the cursor to view output.
-          await this.#moveCursorLast(denops);
-        } else {
-          // NOTE: It is not ddt-ui-shell buffer.
-          await denops.cmd("stopinsert");
-        }
 
         this.#updatePrompt(
           denops,
