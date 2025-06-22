@@ -921,6 +921,7 @@ export class Ui extends BaseUi<Params> {
     for await (const data of this.#pty.readable) {
       if (await fn.bufnr(denops) === this.#bufNr) {
         // NOTE: Move the cursor to view output.
+        // If the cursor move is after output, the output will be broken.
         await this.#moveCursorLast(denops);
       } else {
         // NOTE: It is not ddt-ui-shell buffer.
