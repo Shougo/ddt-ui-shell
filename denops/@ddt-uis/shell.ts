@@ -919,6 +919,8 @@ export class Ui extends BaseUi<Params> {
     const promptLineNr = currentLineNr;
 
     for await (const data of this.#pty.readable) {
+      console.log(data);
+
       if (await fn.bufnr(denops) === this.#bufNr) {
         // NOTE: Move the cursor to view output.
         // If the cursor move is after output, the output will be broken.
@@ -1104,12 +1106,10 @@ export class Ui extends BaseUi<Params> {
 
       if (passwordRegex.exec(data)) {
         // NOTE: Move the cursor to make the output more visible.
+        await this.#moveCursorLast(denops);
         await denops.cmd("normal! zz");
 
-        const secret = await fn.inputsecret(denops, "Password: ");
-        if (secret.length > 0) {
-          this.#pty.write(`${secret}\n`);
-        }
+        this.#pty.write(`${await fn.inputsecret(denops, "Password: ")}\n`);
       }
     }
   }
