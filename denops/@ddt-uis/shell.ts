@@ -985,6 +985,10 @@ export class Ui extends BaseUi<Params> {
             overwrite = true;
           }
 
+          if (is.String(annotation.text)) {
+            annotation.text = annotation.text.replaceAll("\r", "");
+          }
+
           if (annotation.csi?.sgr?.reset) {
             // Reset colors.
             currentHighlights.length = 0;
@@ -1061,10 +1065,10 @@ export class Ui extends BaseUi<Params> {
 
         if (overwrite && bufLines.length > 0) {
           // Overwrite current line.
-          bufLines[bufLines.length - 1] = trimmed;
+          bufLines[bufLines.length - 1] = currentText;
         } else {
           // Append new line.
-          bufLines.push(trimmed);
+          bufLines.push(currentText);
         }
       }
 
