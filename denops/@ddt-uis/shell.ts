@@ -942,140 +942,129 @@ export class Ui extends BaseUi<Params> {
       const bufLines: string[] = [];
 
       for (const line of data.split(/\r*\n/)) {
-        const parts = line.split(/(\r)/).filter((s) =>
-          s.length > 0 && s !== "\r"
+        const [trimmed, annotations] = trimAndParse(
+          extractLastOverwriteContent(line),
         );
 
-        for (const part of parts) {
-          let overwrite = part.startsWith("\r");
-          const content = part.replace(/^\r/, "");
+        currentLineNr += 1;
+        let currentCol = 1;
+        const currentIndex = currentLineNr - promptLineNr;
+        let currentText = currentIndex < bufLines.length
+          ? bufLines[currentIndex]
+          : "";
 
-          const [trimmed, annotations] = trimAndParse(content);
+        type CurrentHighlight = {
+          highlight: string;
+          name: string;
+          priority: number;
+        };
 
-          currentLineNr += 1;
-          let currentCol = 1;
-          const currentIndex = currentLineNr - promptLineNr;
-          let currentText = currentIndex < bufLines.length
-            ? bufLines[currentIndex]
-            : "";
+        const currentHighlights: CurrentHighlight[] = [];
+        let overwrite = false;
 
-          type CurrentHighlight = {
-            highlight: string;
-            name: string;
-            priority: number;
-          };
+        for (
+          const annotation of transformAnnotations(trimmed, annotations)
+        ) {
+          if (options.debug) {
+            console.log(annotation);
+          }
 
-          const currentHighlights: CurrentHighlight[] = [];
+          const foreground = annotation.csi?.sgr?.foreground;
+          const background = annotation.csi?.sgr?.background;
+          const italic = annotation.csi?.sgr?.italic;
+          const bold = annotation.csi?.sgr?.bold;
+          const underline = annotation.csi?.sgr?.underline;
 
-          for (
-            const annotation of transformAnnotations(trimmed, annotations)
+          if (
+            (is.Number(annotation.csi?.cha) && annotation.csi?.cha >= 0) ||
+            (is.Number(annotation.csi?.el) && annotation.csi?.el >= 0) ||
+            (is.Number(annotation.csi?.ed) && annotation.csi?.ed >= 0) ||
+            is.String(annotation.text) && annotation.text.match(/\s\d+%/)
           ) {
-            if (options.debug) {
-              console.log(annotation);
-            }
-
-            const foreground = annotation.csi?.sgr?.foreground;
-            const background = annotation.csi?.sgr?.background;
-            const italic = annotation.csi?.sgr?.italic;
-            const bold = annotation.csi?.sgr?.bold;
-            const underline = annotation.csi?.sgr?.underline;
-
-            if (
-              (is.Number(annotation.csi?.cha) && annotation.csi?.cha >= 0) ||
-              (is.Number(annotation.csi?.el) && annotation.csi?.el >= 0) ||
-              (is.Number(annotation.csi?.ed) && annotation.csi?.ed >= 0) ||
-              is.String(annotation.text) && annotation.text.match(/\s\d+%/)
-            ) {
-              // Overwrite current line
-              overwrite = true;
-            }
-
-            if (is.String(annotation.text)) {
-              // Replace CR
-              annotation.text = annotation.text.replace(/\r/, "");
-            }
-
-            if (annotation.csi?.sgr?.reset) {
-              // Reset colors.
-              currentHighlights.length = 0;
-            }
-
-            if (
-              is.Number(background) && background > 0 && background < 16 &&
-              uiParams.ansiColorHighlights.bgs
-            ) {
-              currentHighlights.push({
-                highlight: uiParams.ansiColorHighlights.bgs[background],
-                name: `ANSIColorBG${background}`,
-                priority: 5,
-              });
-            }
-            if (
-              is.Boolean(bold) && uiParams.ansiColorHighlights.bold
-            ) {
-              currentHighlights.push({
-                highlight: uiParams.ansiColorHighlights.bold,
-                name: `ANSIColorBold`,
-                priority: 100,
-              });
-            }
-            if (
-              is.Number(foreground) && foreground > 0 && foreground < 16 &&
-              uiParams.ansiColorHighlights.fgs
-            ) {
-              currentHighlights.push({
-                highlight: uiParams.ansiColorHighlights.fgs[foreground],
-                name: `ANSIColorFG${foreground}`,
-                priority: 10,
-              });
-            }
-            if (
-              is.Boolean(italic) && uiParams.ansiColorHighlights.italic
-            ) {
-              currentHighlights.push({
-                highlight: uiParams.ansiColorHighlights.italic,
-                name: `ANSIColorItalic`,
-                priority: 100,
-              });
-            }
-            if (
-              is.Boolean(underline) && uiParams.ansiColorHighlights.underline
-            ) {
-              currentHighlights.push({
-                highlight: uiParams.ansiColorHighlights.underline,
-                name: `ANSIColorUnderline`,
-                priority: 100,
-              });
-            }
-
-            if (annotation.text) {
-              if (overwrite) {
-                currentText = annotation.text;
-              } else {
-                currentText += annotation.text;
-              }
-
-              // Add highlights
-              for (const highlight of currentHighlights) {
-                ansiHighlights.push({
-                  ...highlight,
-                  row: currentLineNr,
-                  col: currentCol,
-                  length: annotation.text.length,
-                });
-              }
-
-              currentCol = currentText.length + 1;
-            }
+            // Overwrite current line
+            overwrite = true;
           }
 
-          if (overwrite && bufLines.length > 0) {
-            // Overwrite current line.
-            bufLines[bufLines.length - 1] = trimmed;
-          } else {
-            // Append new line.
-            bufLines.push(trimmed);
+          if (annotation.csi?.sgr?.reset) {
+            // Reset colors.
+            currentHighlights.length = 0;
           }
+
+          if (
+            is.Number(background) && background > 0 && background < 16 &&
+            uiParams.ansiColorHighlights.bgs
+          ) {
+            currentHighlights.push({
+              highlight: uiParams.ansiColorHighlights.bgs[background],
+              name: `ANSIColorBG${background}`,
+              priority: 5,
+            });
+          }
+          if (
+            is.Boolean(bold) && uiParams.ansiColorHighlights.bold
+          ) {
+            currentHighlights.push({
+              highlight: uiParams.ansiColorHighlights.bold,
+              name: `ANSIColorBold`,
+              priority: 100,
+            });
+          }
+          if (
+            is.Number(foreground) && foreground > 0 && foreground < 16 &&
+            uiParams.ansiColorHighlights.fgs
+          ) {
+            currentHighlights.push({
+              highlight: uiParams.ansiColorHighlights.fgs[foreground],
+              name: `ANSIColorFG${foreground}`,
+              priority: 10,
+            });
+          }
+          if (
+            is.Boolean(italic) && uiParams.ansiColorHighlights.italic
+          ) {
+            currentHighlights.push({
+              highlight: uiParams.ansiColorHighlights.italic,
+              name: `ANSIColorItalic`,
+              priority: 100,
+            });
+          }
+          if (
+            is.Boolean(underline) && uiParams.ansiColorHighlights.underline
+          ) {
+            currentHighlights.push({
+              highlight: uiParams.ansiColorHighlights.underline,
+              name: `ANSIColorUnderline`,
+              priority: 100,
+            });
+          }
+
+          if (annotation.text) {
+            if (overwrite) {
+              currentText = annotation.text;
+            } else {
+              currentText += annotation.text;
+            }
+
+            // Add highlights
+            for (const highlight of currentHighlights) {
+              ansiHighlights.push({
+                ...highlight,
+                row: currentLineNr,
+                col: currentCol,
+                length: annotation.text.length,
+              });
+            }
+
+            currentCol = currentText.length + 1;
+          }
+        }
+
+        if (overwrite && bufLines.length > 0) {
+          // Overwrite current line.
+          bufLines[bufLines.length - 1] = trimmed;
+        } else {
+          // Append new line.
+          bufLines.push(trimmed);
         }
       }
 
@@ -1350,6 +1339,20 @@ function* transformAnnotations(trimmed: string, annotations: Annotation[]) {
   }
 }
 
+function extractLastOverwriteContent(line: string): string {
+  // deno-lint-ignore no-control-regex
+  const re = /(?:\r|\x1b\[0G)./g;
+  let match: RegExpExecArray | null;
+  let lastIdx = -1;
+  while ((match = re.exec(line)) !== null) {
+    lastIdx = match.index;
+  }
+  if (lastIdx === -1) {
+    return line;
+  }
+  return line.slice(lastIdx);
+}
+
 Deno.test("splitArgs should split a simple command", () => {
   assertEquals(splitArgs("ls -la"), ["ls", "-la"]);
 });
@@ -1394,4 +1397,13 @@ Deno.test("transformAnnotations()", () => {
     },
     { text: "Goodbye" },
   ]);
+});
+
+Deno.test("extractLastOverwriteContent()", () => {
+  assertEquals(
+    extractLastOverwriteContent(
+      "\x1b[0G⠙ Fetching updates\x1b[0G\x1b[0G⠹ Fetching updates\x1b[0G",
+    ),
+    "\x1b[0G\x1b[0G⠹ Fetching updates\x1b[0G",
+  );
 });
