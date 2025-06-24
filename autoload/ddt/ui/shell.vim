@@ -131,7 +131,10 @@ function ddt#ui#shell#_highlight(
     return
   endif
 
-  const length = a:length ==# 0 ? max_col - a:col + 1 : a:length
+  const length =
+        \    (a:length ==# 0 || a:col + a:length > max_col)
+        \  ? max_col - a:col + 1
+        \  : a:length
 
   if has('nvim')
     call nvim_buf_set_extmark(

@@ -7,11 +7,11 @@ import type {
 import { BaseUi, type UiActions } from "jsr:@shougo/ddt-vim@~1.2.0/ui";
 import { printError, safeStat } from "jsr:@shougo/ddt-vim@~1.2.0/utils";
 
-import type { Denops } from "jsr:@denops/std@~7.5.0";
-import * as fn from "jsr:@denops/std@~7.5.0/function";
-import * as vars from "jsr:@denops/std@~7.5.0/variable";
-import { batch } from "jsr:@denops/std@~7.5.0/batch";
-import * as autocmd from "jsr:@denops/std@~7.5.0/autocmd";
+import type { Denops } from "jsr:@denops/std@~7.6.0";
+import * as fn from "jsr:@denops/std@~7.6.0/function";
+import * as vars from "jsr:@denops/std@~7.6.0/variable";
+import { batch } from "jsr:@denops/std@~7.6.0/batch";
+import * as autocmd from "jsr:@denops/std@~7.6.0/autocmd";
 
 import { is } from "jsr:@core/unknownutil@~4.3.0/is";
 import { join } from "jsr:@std/path@~1.1.0/join";
@@ -804,6 +804,7 @@ export class Ui extends BaseUi<Params> {
     this.#cwd = abspath;
 
     await fn.chdir(denops, this.#cwd);
+    await denops.cmd("doautocmd DirChanged");
 
     await this.#newPrompt(denops, params);
   }
