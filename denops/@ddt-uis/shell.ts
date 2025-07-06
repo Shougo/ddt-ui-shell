@@ -926,6 +926,10 @@ export class Ui extends BaseUi<Params> {
     const promptLineNr = currentLineNr;
 
     for await (const data of this.#pty.readable) {
+      if (options.debug) {
+        console.log(data);
+      }
+
       await this.#moveCursorLast(denops);
 
       type ANSIHighlight = {
