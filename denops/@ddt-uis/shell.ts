@@ -987,6 +987,10 @@ export class Ui extends BaseUi<Params> {
             is.String(annotation.text) && annotation.text.match(/\s\d+%/)
           ) {
             // Overwrite current line
+            if (options.debug) {
+              console.log("Overwrite current line");
+            }
+
             overwrite = true;
           }
 
