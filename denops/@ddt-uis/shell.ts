@@ -947,15 +947,13 @@ export class Ui extends BaseUi<Params> {
       const bufLines: string[] = [];
 
       for (const line of data.split(/\r*\n/)) {
-        if (options.debug) {
-          console.log(
-            `line: ${line}" to "${extractLastOverwriteContent(line)}"`,
-          );
+        const extract = extractLastOverwriteContent(line);
+
+        if (options.debug && line !== extract) {
+          console.log(`line: "${line}" to "${extract}"`);
         }
 
-        const [trimmed, annotations] = trimAndParse(
-          extractLastOverwriteContent(line),
-        );
+        const [trimmed, annotations] = trimAndParse(extract);
 
         currentLineNr += 1;
         let currentCol = 1;
@@ -986,13 +984,18 @@ export class Ui extends BaseUi<Params> {
           const bold = annotation.csi?.sgr?.bold;
           const underline = annotation.csi?.sgr?.underline;
 
+          if (is.Number(annotation.csi?.cuu) && annotation.csi?.cuu > 0) {
+            currentLineNr -= 1;
+          }
+
           if (
             (is.Number(annotation.csi?.cha) && annotation.csi?.cha >= 0) ||
             (is.Number(annotation.csi?.el) && annotation.csi?.el > 0) ||
+            (is.Number(annotation.csi?.cuu) && annotation.csi?.cuu > 0) ||
             (is.Number(annotation.csi?.ed) && annotation.csi?.ed >= 0)
           ) {
             // Overwrite current line
-            if (options.debug) {
+            if (!overwrite && options.debug) {
               console.log("Overwrite current line");
             }
 
@@ -1058,6 +1061,13 @@ export class Ui extends BaseUi<Params> {
 
           if (annotation.text) {
             if (overwrite) {
+              if (options.debug) {
+                console.log(
+                  "Overwrite current line: " +
+                    `"${currentText}" to "${annotation.text}"`,
+                );
+              }
+
               currentText = annotation.text;
             } else {
               currentText += annotation.text;
@@ -1078,14 +1088,6 @@ export class Ui extends BaseUi<Params> {
         }
 
         if (overwrite && bufLines.length > 0) {
-          // Overwrite current line.
-          if (options.debug) {
-            console.log(
-              "Overwrite current line: " +
-                `${bufLines[bufLines.length - 1]}" to "${currentText}"`,
-            );
-          }
-
           bufLines[bufLines.length - 1] = currentText;
         } else {
           // Append new line.
