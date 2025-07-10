@@ -1073,6 +1073,11 @@ export class Ui extends BaseUi<Params> {
 
         if (overwrite && bufLines.length > 0) {
           // Overwrite current line.
+          if (options.debug) {
+            console.log("Overwrite current line: " +
+              `${bufLines[bufLines.length - 1]}" to "${currentText}"`);
+          }
+
           bufLines[bufLines.length - 1] = currentText;
         } else {
           // Append new line.
