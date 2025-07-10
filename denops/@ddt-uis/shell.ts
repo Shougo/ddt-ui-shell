@@ -990,7 +990,7 @@ export class Ui extends BaseUi<Params> {
               console.log("Overwrite current line");
             }
 
-            overwrite = true;
+            //overwrite = true;
           }
 
           if (is.String(annotation.text)) {
