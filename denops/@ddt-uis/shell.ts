@@ -947,6 +947,12 @@ export class Ui extends BaseUi<Params> {
       const bufLines: string[] = [];
 
       for (const line of data.split(/\r*\n/)) {
+        if (options.debug) {
+          console.log(
+            `line: ${line}" to "${extractLastOverwriteContent(line)}"`,
+          );
+        }
+
         const [trimmed, annotations] = trimAndParse(
           extractLastOverwriteContent(line),
         );
@@ -990,7 +996,7 @@ export class Ui extends BaseUi<Params> {
               console.log("Overwrite current line");
             }
 
-            //overwrite = true;
+            overwrite = true;
           }
 
           if (is.String(annotation.text)) {
@@ -1074,8 +1080,10 @@ export class Ui extends BaseUi<Params> {
         if (overwrite && bufLines.length > 0) {
           // Overwrite current line.
           if (options.debug) {
-            console.log("Overwrite current line: " +
-              `${bufLines[bufLines.length - 1]}" to "${currentText}"`);
+            console.log(
+              "Overwrite current line: " +
+                `${bufLines[bufLines.length - 1]}" to "${currentText}"`,
+            );
           }
 
           bufLines[bufLines.length - 1] = currentText;
