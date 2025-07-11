@@ -925,9 +925,12 @@ export class Ui extends BaseUi<Params> {
 
     const promptLineNr = currentLineNr;
 
+    // Get all lines.
+    const bufLines: string[] = [];
+
     for await (const data of this.#pty.readable) {
       if (options.debug) {
-        console.log(data);
+        console.log(`data = "${data}"`);
       }
 
       await this.#moveCursorLast(denops);
@@ -943,13 +946,14 @@ export class Ui extends BaseUi<Params> {
 
       const ansiHighlights: ANSIHighlight[] = [];
 
-      // Get all lines.
-      const bufLines: string[] = [];
-
       for (const line of data.split(/\r*\n/)) {
+        if (line.length === 0) {
+          continue;
+        }
+
         const extract = extractLastOverwriteContent(line);
 
-        if (options.debug && line !== extract) {
+        if (options.debug) {
           console.log(`line: "${line}" to "${extract}"`);
         }
 
@@ -961,6 +965,9 @@ export class Ui extends BaseUi<Params> {
         let currentText = currentIndex < bufLines.length
           ? bufLines[currentIndex]
           : "";
+        if (options.debug) {
+          console.log(bufLines);
+        }
 
         type CurrentHighlight = {
           highlight: string;
@@ -1073,6 +1080,10 @@ export class Ui extends BaseUi<Params> {
               currentText += annotation.text;
             }
 
+            if (options.debug) {
+              console.log(`currentText: "${currentText}"`);
+            }
+
             // Add highlights
             for (const highlight of currentHighlights) {
               ansiHighlights.push({
@@ -1091,6 +1102,10 @@ export class Ui extends BaseUi<Params> {
           bufLines[bufLines.length - 1] = currentText;
         } else {
           // Append new line.
+          if (options.debug) {
+            console.log(`push: ${currentText}`);
+          }
+
           bufLines.push(currentText);
         }
       }
@@ -1121,7 +1136,6 @@ export class Ui extends BaseUi<Params> {
         // NOTE: Move the cursor to make the output more visible.
         await this.#moveCursorLast(denops);
         await denops.cmd("normal! zz");
-
         this.#pty.write(`${await fn.inputsecret(denops, "Password: ")}\n`);
       }
     }
