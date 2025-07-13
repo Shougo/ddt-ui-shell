@@ -100,6 +100,7 @@ export class Ui extends BaseUi<Params> {
   #prompt = "";
   #pty: Pty | null = null;
   #startTime: number | null = null;
+  #bufferStack: string[] = [];
 
   override async redraw(args: {
     denops: Denops;
@@ -322,6 +323,40 @@ export class Ui extends BaseUi<Params> {
           args.uiParams.promptPattern,
           "bWn",
         );
+      },
+    },
+    pushBufferStack: {
+      description: "Push the command line to buffer stack",
+      callback: async (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiParams: Params;
+      }) => {
+        if (
+          args.uiParams.promptPattern === "" ||
+          await fn.bufnr(args.denops, "%") != this.#bufNr
+        ) {
+          return;
+        }
+
+        const commandLine = await getCommandLine(
+          args.denops,
+          args.uiParams.promptPattern,
+          this.#prompt,
+        );
+
+        if (commandLine.length === 0) {
+          return;
+        }
+
+        // NOTE: save current bufferStack to clear command line.
+        const bufferStack = this.#bufferStack;
+        bufferStack.push(commandLine);
+        this.#bufferStack = [];
+
+        await this.#newPrompt(args.denops, args.uiParams, "");
+
+        this.#bufferStack = bufferStack;
       },
     },
     redraw: {
@@ -591,6 +626,14 @@ export class Ui extends BaseUi<Params> {
     if (this.#pty) {
       this.#pty.close();
       this.#pty = null;
+    }
+
+    if (commandLine.length === 0) {
+      const lastCommandLine = this.#bufferStack.pop();
+      if (lastCommandLine) {
+        // Restore the last command line.
+        commandLine = lastCommandLine;
+      }
     }
 
     await this.#updatePrompt(denops, params.prompt + " ");

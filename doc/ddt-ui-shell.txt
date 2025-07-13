@@ -74,6 +74,11 @@ pastePrompt
 previousPrompt
 		Move to the previous prompt from cursor.
 
+                                         *ddu-ui-shell-action-pushBufferStack*
+pushBufferStack
+		Push the command line to buffer stack and clear the command
+		line.
+
                                                   *ddu-ui-shell-action-redraw*
 redraw
 		Redraw the UI prompt.
