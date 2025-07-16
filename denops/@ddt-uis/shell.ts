@@ -922,6 +922,12 @@ export class Ui extends BaseUi<Params> {
         TERM: "xterm",
       };
 
+      if (!await fn.executable(denops, cmd)) {
+        printError(denops, `${cmd} is not executable file.`);
+        await this.#newPrompt(denops, uiParams);
+        return;
+      }
+
       this.#pty = new Pty(cmd, {
         args: cmdArgs,
         env,
