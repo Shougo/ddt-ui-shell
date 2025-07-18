@@ -1181,9 +1181,10 @@ export class Ui extends BaseUi<Params> {
         await fn.getbufoneline(denops, this.#bufNr, "$"),
       );
 
+      await this.#moveCursorLast(denops);
+
       if (passwordRegex.exec(data)) {
         // NOTE: Move the cursor to make the output more visible.
-        await this.#moveCursorLast(denops);
         await denops.cmd("normal! zz");
         this.#pty.write(`${await fn.inputsecret(denops, "Password: ")}\n`);
       }
