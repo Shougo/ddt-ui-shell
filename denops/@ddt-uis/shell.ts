@@ -1381,6 +1381,10 @@ async function appendHistory(
   params: Params,
   commandLine: string,
 ) {
+  if (params.shellHistoryPath.length === 0) {
+    return;
+  }
+
   try {
     let history = await getHistory(denops, params);
     history.push(commandLine);
