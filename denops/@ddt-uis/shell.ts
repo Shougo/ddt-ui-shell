@@ -1139,11 +1139,13 @@ export class Ui extends BaseUi<Params> {
                 ...highlight,
                 row: currentLineNr,
                 col: currentCol,
-                length: annotation.text.length,
+                // NOTE: It must be byte length.
+                length: await fn.len(denops, annotation.text),
               });
             }
 
-            currentCol = currentText.length + 1;
+            // NOTE: It must be byte length.
+            currentCol = await fn.len(denops, currentText) + 1;
           }
         }
 
