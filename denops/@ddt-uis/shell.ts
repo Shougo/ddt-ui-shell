@@ -1357,13 +1357,18 @@ async function getHistory(denops: Denops, params: Params): Promise<string[]> {
     return [];
   }
 
-  const stat = await safeStat(params.shellHistoryPath);
+  const historyPath = await fn.expand(
+    denops,
+    params.shellHistoryPath,
+  ) as string;
+
+  const stat = await safeStat(historyPath);
   if (!stat) {
     return [];
   }
 
   try {
-    const content = await Deno.readTextFile(params.shellHistoryPath);
+    const content = await Deno.readTextFile(historyPath);
     const lines = content.split("\n").filter((line: string) =>
       line.trim() !== ""
     );
@@ -1387,11 +1392,16 @@ async function appendHistory(
     return;
   }
 
+  const historyPath = await fn.expand(
+    denops,
+    params.shellHistoryPath,
+  ) as string;
+
   try {
     let history = await getHistory(denops, params);
     history.push(commandLine);
     history = history.slice(-params.shellHistoryMax);
-    await Deno.writeTextFile(params.shellHistoryPath, history.join("\n"));
+    await Deno.writeTextFile(historyPath, history.join("\n"));
   } catch (error) {
     printError(denops, "Error reading history file:", error);
     throw error;
