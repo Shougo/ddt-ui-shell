@@ -1,6 +1,7 @@
 {
   "name": "@shougo/ddt-ui-shell",
   "version": "0.0.0",
+  "lock": false,
   "exports": {
     ".": "./denops/@ddt-uis/shell.ts"
   },
@@ -9,9 +10,6 @@
       "denops/@ddt-uis/**/*.ts"
     ]
   },
-  "imports": {
-  },
-  "lock": false,
   "tasks": {
     "cache": "deno cache --reload denops/**/*.ts",
     "check": "deno check denops/**/*.ts",
@@ -19,6 +17,10 @@
     "lint-fix": "deno lint --fix denops",
     "fmt": "deno fmt denops",
     "test": "deno test -A --doc --parallel --shuffle denops/**/*.ts",
-    "upgrade": "deno run -A jsr:@molt/cli **/*.ts --write"
-  }
+    "update": "deno outdated --recursive",
+    "upgrade": "deno outdated --recursive --update"
+  },
+  "workspace": [
+    "./denops/@ddt-uis/shell"
+  ]
 }

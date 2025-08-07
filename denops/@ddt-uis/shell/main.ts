@@ -3,30 +3,25 @@ import type {
   Context,
   DdtOptions,
   UiOptions,
-} from "jsr:@shougo/ddt-vim@~1.2.0/types";
-import { BaseUi, type UiActions } from "jsr:@shougo/ddt-vim@~1.2.0/ui";
-import { printError, safeStat } from "jsr:@shougo/ddt-vim@~1.2.0/utils";
+} from "@shougo/ddt-vim/types";
+import { BaseUi, type UiActions } from "@shougo/ddt-vim/ui";
+import { printError, safeStat } from "@shougo/ddt-vim/utils";
 
-import type { Denops } from "jsr:@denops/std@~7.6.0";
-import * as fn from "jsr:@denops/std@~7.6.0/function";
-import * as vars from "jsr:@denops/std@~7.6.0/variable";
-import { batch } from "jsr:@denops/std@~7.6.0/batch";
-import * as autocmd from "jsr:@denops/std@~7.6.0/autocmd";
+import type { Denops } from "@denops/std";
+import * as fn from "@denops/std/function";
+import * as vars from "@denops/std/variable";
+import { batch } from "@denops/std/batch";
+import * as autocmd from "@denops/std/autocmd";
 
-import { is } from "jsr:@core/unknownutil@~4.3.0/is";
-import { join } from "jsr:@std/path@~1.1.0/join";
-import { resolve } from "jsr:@std/path@~1.1.0/resolve";
-import { relative } from "jsr:@std/path@~1.1.0/relative";
-import { isAbsolute } from "jsr:@std/path@~1.1.0/is-absolute";
-import { assertEquals } from "jsr:@std/assert@~1.0.2/equals";
-import { expandGlob } from "jsr:@std/fs@~1.0.2/expand-glob";
-import { Pty } from "jsr:@sigma/pty-ffi@~0.36.0";
-import {
-  type Annotation,
-  trimAndParse,
-} from "jsr:@lambdalisue/ansi-escape-code@~1.0.4";
-
-//import { parse } from 'jsr:@fcrozatier/monarch@~2.3.2';
+import { is } from "@core/unknownutil/is";
+import { join } from "@std/path/join";
+import { resolve } from "@std/path/resolve";
+import { relative } from "@std/path/relative";
+import { isAbsolute } from "@std/path/is-absolute";
+import { assertEquals } from "@std/assert/equals";
+import { expandGlob } from "@std/fs/expand-glob";
+import { Pty } from "@sigma/pty-ffi";
+import { type Annotation, trimAndParse } from "@lambdalisue/ansi-escape-code";
 
 type ExprNumber = string | number;
 
