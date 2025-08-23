@@ -1,7 +1,7 @@
 {
   "name": "@shougo/ddt-ui-shell",
   "exports": {
-    ".": "./shell.ts"
+    ".": "./main.ts"
   },
   "publish": {
     "include": [
