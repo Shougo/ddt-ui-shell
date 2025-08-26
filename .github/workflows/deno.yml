@@ -1,7 +1,7 @@
 name: deno
 
 env:
-  DENO_VERSION: 1.x
+  DENO_VERSION: 2.x
   DENOPS_PATH: "./"
 
 on:
@@ -31,3 +31,14 @@ jobs:
 
       - name: Check Format
         run: deno task fmt --check
+
+  deno-test-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@main
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Test Publish
+        run: deno task test:publish
