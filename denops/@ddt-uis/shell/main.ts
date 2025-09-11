@@ -637,8 +637,11 @@ export class Ui extends BaseUi<Params> {
     const userPrompts = params.userPrompt.length !== 0
       ? (await denops.eval(params.userPrompt) as string).split("\n")
       : [];
-    promptLines = promptLines.concat(userPrompts);
-    promptLines.push(`${params.prompt} ${commandLine}`);
+    promptLines = [
+      ...promptLines,
+      ...userPrompts,
+      `${params.prompt} ${commandLine}`,
+    ];
 
     const lastLine = await fn.getbufoneline(denops, this.#bufNr, "$");
     if (lastLine === params.prompt + " ") {
@@ -1297,7 +1300,7 @@ async function parseCommandLine(
 ): Promise<string[]> {
   let result: string[] = [];
   for (const arg of splitArgs(input)) {
-    result = result.concat(await expandArg(cwd, arg));
+    result = [...result, ...await expandArg(cwd, arg)];
   }
   return result;
 }
