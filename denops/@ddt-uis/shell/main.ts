@@ -940,16 +940,9 @@ export class Ui extends BaseUi<Params> {
       }
 
       if (this.#startTime) {
-        await fn.appendbufline(
+        await this.#printMessage(
           denops,
-          this.#bufNr,
-          "$",
           `ddt-ui-shell: ${Date.now() - this.#startTime} ms`,
-        );
-
-        this.#updatePrompt(
-          denops,
-          await fn.getbufoneline(denops, this.#bufNr, "$"),
         );
 
         this.#startTime = null;
@@ -959,6 +952,23 @@ export class Ui extends BaseUi<Params> {
     } else {
       this.#pty.write(`${commandLine}\n`);
     }
+  }
+
+  async #printMessage(
+    denops: Denops,
+    message: string,
+  ) {
+    await fn.appendbufline(
+      denops,
+      this.#bufNr,
+      "$",
+      message,
+    );
+
+    this.#updatePrompt(
+      denops,
+      await fn.getbufoneline(denops, this.#bufNr, "$"),
+    );
   }
 
   async #checkOutput(
@@ -1197,16 +1207,9 @@ export class Ui extends BaseUi<Params> {
 
     // Print exit code
     if (this.#pty.exitCode != 0) {
-      await fn.appendbufline(
+      await this.#printMessage(
         denops,
-        this.#bufNr,
-        "$",
         `ddt-ui-shell: exit ${this.#pty.exitCode}`,
-      );
-
-      this.#updatePrompt(
-        denops,
-        await fn.getbufoneline(denops, this.#bufNr, "$"),
       );
     }
 
