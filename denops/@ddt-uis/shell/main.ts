@@ -944,7 +944,12 @@ export class Ui extends BaseUi<Params> {
           denops,
           this.#bufNr,
           "$",
-          `${Date.now() - this.#startTime} ms`,
+          `ddt-ui-shell: ${Date.now() - this.#startTime} ms`,
+        );
+
+        this.#updatePrompt(
+          denops,
+          await fn.getbufoneline(denops, this.#bufNr, "$"),
         );
 
         this.#startTime = null;
@@ -1190,6 +1195,21 @@ export class Ui extends BaseUi<Params> {
       }
     }
 
+    // Print exit code
+    if (this.#pty.exitCode != 0) {
+      await fn.appendbufline(
+        denops,
+        this.#bufNr,
+        "$",
+        `ddt-ui-shell: exit ${this.#pty.exitCode}`,
+      );
+
+      this.#updatePrompt(
+        denops,
+        await fn.getbufoneline(denops, this.#bufNr, "$"),
+      );
+    }
+
     await this.#moveCursorLast(denops);
   }
 }
@@ -1225,12 +1245,12 @@ async function searchPrompt(
   denops: Denops,
   promptPattern: string,
   flags: string,
-) {
+): Promise<number> {
   await fn.cursor(denops, 0, 1);
   const pattern = `^\\%(${promptPattern}\\m\\).\\?`;
   const pos = await fn.searchpos(denops, pattern, flags) as number[];
   if (pos[0] == 0) {
-    return;
+    return -1;
   }
 
   const col = await fn.matchend(
@@ -1243,6 +1263,8 @@ async function searchPrompt(
     pos[0],
     col,
   );
+
+  return pos[0];
 }
 
 async function searchUserPrompt(
