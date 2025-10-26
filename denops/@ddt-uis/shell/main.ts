@@ -1206,7 +1206,7 @@ export class Ui extends BaseUi<Params> {
     }
 
     // Print exit code
-    if (this.#pty.exitCode != 0) {
+    if (this.#pty.exitCode && this.#pty.exitCode != 0) {
       await this.#printMessage(
         denops,
         `ddt-ui-shell: exit ${this.#pty.exitCode}`,
