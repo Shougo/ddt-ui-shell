@@ -279,6 +279,10 @@ vim {path}
 
 		Edit {path} file.
 
+                                                   *ddu-ui-shell-builtin-with*
+with {command-line}
+		Specify command line prefix for continuous workflow.
+
 ==============================================================================
 EXAMPLES                                               *ddt-ui-shell-examples*
 >vim

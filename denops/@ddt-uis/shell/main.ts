@@ -96,6 +96,7 @@ export class Ui extends BaseUi<Params> {
   #pty: Pty | null = null;
   #startTime: number | null = null;
   #bufferStack: string[] = [];
+  #with: string[] = [];
 
   override async redraw(args: {
     denops: Denops;
@@ -548,6 +549,22 @@ export class Ui extends BaseUi<Params> {
         };
       },
     },
+    with: {
+      description: "Specify command line prefix for continuous workflow",
+      callback: (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiOptions: UiOptions;
+        uiParams: Params;
+        cmdArgs: string[];
+      }) => {
+        this.#with = args.cmdArgs;
+
+        return Promise.resolve({
+          value: 0,
+        });
+      },
+    },
   };
 
   async #switchBuffer(denops: Denops, params: Params, newCwd: string) {
@@ -621,6 +638,11 @@ export class Ui extends BaseUi<Params> {
     if (this.#pty) {
       this.#pty.close();
       this.#pty = null;
+    }
+
+    if (this.#with.length !== 0) {
+      // Restore the command prefix.
+      commandLine = this.#with.join(" ") + " ";
     }
 
     if (commandLine.length === 0) {
