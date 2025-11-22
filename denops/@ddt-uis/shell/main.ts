@@ -6,7 +6,7 @@ import type {
 } from "@shougo/ddt-vim/types";
 import { BaseUi, type UiActions } from "@shougo/ddt-vim/ui";
 import { printError, safeStat } from "@shougo/ddt-vim/utils";
-import { parseCommandLine } from "./parse.ts";
+import { parseCommandLine, parseCommandLineWithEnv } from "./parse.ts";
 
 import type { Denops } from "@denops/std";
 import * as fn from "@denops/std/function";
@@ -891,10 +891,11 @@ export class Ui extends BaseUi<Params> {
         return;
       }
 
-      let [cmd, ...cmdArgs] = await parseCommandLine(
-        this.#cwd,
-        commandLine,
-      );
+      let { args: [cmd, ...cmdArgs], env: parsedEnv } =
+        await parseCommandLineWithEnv(
+          this.#cwd,
+          commandLine,
+        );
 
       if (uiParams.aliases[cmd]) {
         // TODO: More improved parse.
@@ -935,6 +936,7 @@ export class Ui extends BaseUi<Params> {
 
       const env = {
         ...(await fn.environ(denops) as Record<string, string>),
+        ...parsedEnv,
         GIT_PAGER: "cat",
         MANPAGER: "cat",
         PAGER: "cat",
