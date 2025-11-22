@@ -6,6 +6,7 @@ import type {
 } from "@shougo/ddt-vim/types";
 import { BaseUi, type UiActions } from "@shougo/ddt-vim/ui";
 import { printError, safeStat } from "@shougo/ddt-vim/utils";
+import { parseCommandLine } from "./parse.ts";
 
 import type { Denops } from "@denops/std";
 import * as fn from "@denops/std/function";
@@ -16,10 +17,8 @@ import * as autocmd from "@denops/std/autocmd";
 import { is } from "@core/unknownutil/is";
 import { join } from "@std/path/join";
 import { resolve } from "@std/path/resolve";
-import { relative } from "@std/path/relative";
 import { isAbsolute } from "@std/path/is-absolute";
 import { assertEquals } from "@std/assert/equals";
-import { expandGlob } from "@std/fs/expand-glob";
 import { Pty } from "@sigma/pty-ffi";
 import { type Annotation, trimAndParse } from "@lambdalisue/ansi-escape-code";
 
@@ -1341,62 +1340,6 @@ async function getCommandLine(
     : substitute;
 }
 
-async function parseCommandLine(
-  cwd: string,
-  input: string,
-): Promise<string[]> {
-  let result: string[] = [];
-  for (const arg of splitArgs(input)) {
-    result = [...result, ...await expandArg(cwd, arg)];
-  }
-  return result;
-}
-
-function splitArgs(input: string): string[] {
-  // Use a regular expression to split the input string by spaces, handling
-  // quotes
-  // TODO: use monarch instead.
-  const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/gi;
-  const result: string[] = [];
-
-  let match = regex.exec(input);
-  while (match) {
-    result.push(match[1] ?? match[2] ?? match[0]);
-    match = regex.exec(input);
-  }
-
-  return result;
-}
-
-async function expandArg(
-  cwd: string,
-  arg: string,
-): Promise<string[]> {
-  let expanded = "";
-
-  for (const c of arg) {
-    if (expanded.length === 0 && c === "~") {
-      // Replace home directory
-      expanded += Deno.env.get("HOME");
-    } else {
-      expanded += c;
-    }
-  }
-
-  if (
-    expanded.includes("*") || expanded.includes("?") || expanded.includes("[")
-  ) {
-    const glob = await Array.fromAsync(expandGlob(expanded, { root: cwd }));
-    if (glob.length > 0) {
-      return glob.map((entry) =>
-        cwd === entry.path ? entry.path : relative(cwd, entry.path)
-      );
-    }
-  }
-
-  return [expanded];
-}
-
 async function getHistory(denops: Denops, params: Params): Promise<string[]> {
   if (params.shellHistoryPath.length === 0) {
     return [];
@@ -1504,26 +1447,6 @@ function extractLastOverwriteContent(line: string): string {
   }
   return line.slice(lastIdx);
 }
-
-Deno.test("splitArgs should split a simple command", () => {
-  assertEquals(splitArgs("ls -la"), ["ls", "-la"]);
-});
-
-Deno.test("splitArgs should handle double quotes", () => {
-  assertEquals(splitArgs('echo "Hello World"'), ["echo", "Hello World"]);
-});
-
-Deno.test("splitArgs should handle single quotes", () => {
-  assertEquals(splitArgs("echo 'Hello World'"), ["echo", "Hello World"]);
-});
-
-Deno.test("splitArgs should handle multiple spaces", () => {
-  assertEquals(splitArgs("  ls    -la   "), ["ls", "-la"]);
-});
-
-Deno.test("splitArgs should handle empty input", () => {
-  assertEquals(splitArgs(""), []);
-});
 
 Deno.test("transformAnnotations()", () => {
   const [trimmed, annotations] = trimAndParse(
