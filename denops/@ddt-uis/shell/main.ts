@@ -24,6 +24,29 @@ import { type Annotation, trimAndParse } from "@lambdalisue/ansi-escape-code";
 
 type ExprNumber = string | number;
 
+/**
+ * Represents a byte length value.
+ * NOTE: This must be a byte length, not character length.
+ * Use `await fn.len(denops, str)` to get byte length in Vim.
+ */
+type ByteLength = number;
+
+/**
+ * Represents a 1-based line number in Vim/Neovim buffer.
+ */
+type LineNumber = number;
+
+/**
+ * Represents a 1-based column number in Vim/Neovim buffer.
+ */
+type ColumnNumber = number;
+
+function debugLog(options: { debug?: boolean }, ...args: unknown[]): void {
+  if (options.debug) {
+    console.log(...args);
+  }
+}
+
 export type ANSIColorHighlights = {
   bgs?: string[];
   bold?: string;
@@ -1005,7 +1028,7 @@ export class Ui extends BaseUi<Params> {
 
     const passwordRegex = new RegExp(uiParams.passwordPattern);
 
-    let currentLineNr =
+    let currentLineNr: LineNumber =
       (await fn.getbufline(denops, this.#bufNr, 1, "$")).length;
 
     const promptLineNr = currentLineNr;
@@ -1014,9 +1037,7 @@ export class Ui extends BaseUi<Params> {
     const bufLines: string[] = [];
 
     for await (const data of this.#pty.readable) {
-      if (options.debug) {
-        console.log(`data = "${data}"`);
-      }
+      debugLog(options, `data = "${data}"`);
 
       await this.#moveCursorLast(denops);
 
@@ -1024,9 +1045,9 @@ export class Ui extends BaseUi<Params> {
         highlight: string;
         name: string;
         priority: number;
-        row: number;
-        col: number;
-        length: number;
+        row: LineNumber;
+        col: ColumnNumber;
+        length: ByteLength;
       };
 
       const ansiHighlights: ANSIHighlight[] = [];
@@ -1038,21 +1059,17 @@ export class Ui extends BaseUi<Params> {
 
         const extract = extractLastOverwriteContent(line);
 
-        if (options.debug) {
-          console.log(`line: "${line}" to "${extract}"`);
-        }
+        debugLog(options, `line: "${line}" to "${extract}"`);
 
         const [trimmed, annotations] = trimAndParse(extract);
 
         currentLineNr += 1;
-        let currentCol = 1;
+        let currentCol: ColumnNumber = 1;
         const currentIndex = currentLineNr - promptLineNr;
         let currentText = currentIndex < bufLines.length
           ? bufLines[currentIndex]
           : "";
-        if (options.debug) {
-          console.log(bufLines);
-        }
+        debugLog(options, bufLines);
 
         type CurrentHighlight = {
           highlight: string;
@@ -1066,9 +1083,7 @@ export class Ui extends BaseUi<Params> {
         for (
           const annotation of transformAnnotations(trimmed, annotations)
         ) {
-          if (options.debug) {
-            console.log(annotation);
-          }
+          debugLog(options, annotation);
 
           const foreground = annotation.csi?.sgr?.foreground;
           const background = annotation.csi?.sgr?.background;
@@ -1087,8 +1102,8 @@ export class Ui extends BaseUi<Params> {
             (is.Number(annotation.csi?.ed) && annotation.csi?.ed >= 0)
           ) {
             // Overwrite current line
-            if (!overwrite && options.debug) {
-              console.log("Overwrite current line");
+            if (!overwrite) {
+              debugLog(options, "Overwrite current line");
             }
 
             overwrite = true;
@@ -1153,21 +1168,18 @@ export class Ui extends BaseUi<Params> {
 
           if (annotation.text) {
             if (overwrite) {
-              if (options.debug) {
-                console.log(
-                  "Overwrite current line: " +
-                    `"${currentText}" to "${annotation.text}"`,
-                );
-              }
+              debugLog(
+                options,
+                "Overwrite current line: " +
+                  `"${currentText}" to "${annotation.text}"`,
+              );
 
               currentText = annotation.text;
             } else {
               currentText += annotation.text;
             }
 
-            if (options.debug) {
-              console.log(`currentText: "${currentText}"`);
-            }
+            debugLog(options, `currentText: "${currentText}"`);
 
             // Add highlights
             for (const highlight of currentHighlights) {
@@ -1175,12 +1187,10 @@ export class Ui extends BaseUi<Params> {
                 ...highlight,
                 row: currentLineNr,
                 col: currentCol,
-                // NOTE: It must be byte length.
                 length: await fn.len(denops, annotation.text),
               });
             }
 
-            // NOTE: It must be byte length.
             currentCol = await fn.len(denops, currentText) + 1;
           }
         }
@@ -1189,9 +1199,7 @@ export class Ui extends BaseUi<Params> {
           bufLines[bufLines.length - 1] = currentText;
         } else {
           // Append new line.
-          if (options.debug) {
-            console.log(`push: ${currentText}`);
-          }
+          debugLog(options, `push: ${currentText}`);
 
           bufLines.push(currentText);
         }
@@ -1439,15 +1447,17 @@ function* transformAnnotations(trimmed: string, annotations: Annotation[]) {
 function extractLastOverwriteContent(line: string): string {
   // deno-lint-ignore no-control-regex
   const re = /(?:\r|\x1b\[0G)./g;
-  let match: RegExpExecArray | null;
-  let lastIdx = -1;
-  while ((match = re.exec(line)) !== null) {
-    lastIdx = match.index;
-  }
-  if (lastIdx === -1) {
+  const matches = [...line.matchAll(re)];
+
+  if (matches.length === 0) {
     return line;
   }
-  return line.slice(lastIdx);
+
+  const lastMatch = matches[matches.length - 1];
+  if (lastMatch.index === undefined) {
+    return line;
+  }
+  return line.slice(lastMatch.index);
 }
 
 Deno.test("transformAnnotations()", () => {
