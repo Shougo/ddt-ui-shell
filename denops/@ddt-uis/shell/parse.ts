@@ -103,7 +103,10 @@ async function expandArg(
   for (const c of arg) {
     if (expanded.length === 0 && c === "~") {
       // Replace home directory
-      expanded += Deno.env.get("HOME");
+      const home = Deno.env.get("HOME");
+      if (home) {
+        expanded += home;
+      }
     } else {
       expanded += c;
     }
