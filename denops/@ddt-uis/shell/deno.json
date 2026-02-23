@@ -10,7 +10,7 @@
   },
   "imports": {
     "@core/unknownutil": "jsr:@core/unknownutil@~4.3.0",
-    "@denops/std": "jsr:@denops/std@~8.1.0",
+    "@denops/std": "jsr:@denops/std@~8.2.0",
     "@lambdalisue/ansi-escape-code": "jsr:@lambdalisue/ansi-escape-code@~1.0.4",
     "@shougo/ddt-vim": "jsr:@shougo/ddt-vim@~2.0.0",
     "@sigma/pty-ffi": "jsr:@sigma/pty-ffi@~0.39.1",
