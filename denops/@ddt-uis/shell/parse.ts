@@ -1,6 +1,6 @@
 import { relative } from "@std/path/relative";
 import { expandGlob } from "@std/fs/expand-glob";
-import { assertEquals } from "@std/assert/equals";
+import { assertEquals, assertThrows } from "@std/assert";
 
 type EnvMap = Record<string, string>;
 
@@ -79,16 +79,137 @@ export async function parseCommandLineWithEnv(
   return { env, args: resultArgs };
 }
 
-export function splitArgs(input: string): string[] {
-  // Use a regular expression to split the input string by spaces, handling
-  // quotes
-  const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/gi;
-  const result: string[] = [];
+export class ParseError extends Error {
+  constructor(message: string, public position: number) {
+    super(message);
+    this.name = "ParseError";
+  }
+}
 
-  let match = regex.exec(input);
-  while (match) {
-    result.push(match[1] ?? match[2] ?? match[0]);
-    match = regex.exec(input);
+type State =
+  | "NORMAL"
+  | "IN_DOUBLE_QUOTE"
+  | "IN_SINGLE_QUOTE"
+  | "ESCAPED_NORMAL"
+  | "ESCAPED_DOUBLE_QUOTE"
+  | "ESCAPED_SINGLE_QUOTE";
+
+export function splitArgs(input: string): string[] {
+  const result: string[] = [];
+  let buffer = "";
+  let inToken = false;
+  let state: State = "NORMAL";
+  let quoteStart = -1;
+
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+
+    switch (state) {
+      case "NORMAL":
+        if (c === '"') {
+          state = "IN_DOUBLE_QUOTE";
+          quoteStart = i;
+          inToken = true;
+        } else if (c === "'") {
+          state = "IN_SINGLE_QUOTE";
+          quoteStart = i;
+          inToken = true;
+        } else if (c === "\\") {
+          state = "ESCAPED_NORMAL";
+          inToken = true;
+        } else if (c === " " || c === "\t") {
+          if (inToken) {
+            result.push(buffer);
+            buffer = "";
+            inToken = false;
+          }
+        } else {
+          buffer += c;
+          inToken = true;
+        }
+        break;
+
+      case "IN_DOUBLE_QUOTE":
+        if (c === '"') {
+          state = "NORMAL";
+        } else if (c === "\\") {
+          state = "ESCAPED_DOUBLE_QUOTE";
+        } else {
+          buffer += c;
+        }
+        break;
+
+      case "IN_SINGLE_QUOTE":
+        if (c === "'") {
+          state = "NORMAL";
+        } else if (c === "\\") {
+          state = "ESCAPED_SINGLE_QUOTE";
+        } else {
+          buffer += c;
+        }
+        break;
+
+      case "ESCAPED_NORMAL":
+        if (c === "\n") {
+          // line continuation - discard newline
+        } else if (c === "t") {
+          buffer += "\t";
+        } else {
+          buffer += c;
+        }
+        state = "NORMAL";
+        break;
+
+      case "ESCAPED_DOUBLE_QUOTE":
+        switch (c) {
+          case '"':
+            buffer += '"';
+            break;
+          case "\\":
+            buffer += "\\";
+            break;
+          case "n":
+            buffer += "\n";
+            break;
+          case "r":
+            buffer += "\r";
+            break;
+          case "t":
+            buffer += "\t";
+            break;
+          default:
+            buffer += c;
+            break;
+        }
+        state = "IN_DOUBLE_QUOTE";
+        break;
+
+      case "ESCAPED_SINGLE_QUOTE":
+        if (c === "'") {
+          buffer += "'";
+        } else {
+          buffer += "\\" + c;
+        }
+        state = "IN_SINGLE_QUOTE";
+        break;
+    }
+  }
+
+  if (
+    state === "IN_DOUBLE_QUOTE" ||
+    state === "IN_SINGLE_QUOTE" ||
+    state === "ESCAPED_DOUBLE_QUOTE" ||
+    state === "ESCAPED_SINGLE_QUOTE"
+  ) {
+    throw new ParseError("Unclosed quote", quoteStart);
+  }
+
+  if (state === "ESCAPED_NORMAL") {
+    buffer += "\\";
+  }
+
+  if (inToken) {
+    result.push(buffer);
   }
 
   return result;
@@ -205,4 +326,72 @@ Deno.test("glob expansion in args (integration)", async () => {
 Deno.test("parseCommandLine wrapper preserves existing behaviour (env discarded)", async () => {
   const args = await parseCommandLine(Deno.cwd(), "X=1 a b");
   assertEquals(args, ["a", "b"]);
+});
+
+Deno.test("splitArgs: escaped double quotes", () => {
+  assertEquals(splitArgs('echo "foo\\"bar"'), ["echo", 'foo"bar']);
+});
+
+Deno.test("splitArgs: escaped single quotes", () => {
+  assertEquals(splitArgs("echo 'don\\'t'"), ["echo", "don't"]);
+});
+
+Deno.test("splitArgs: unclosed double quote", () => {
+  assertThrows(
+    () => splitArgs('echo "unclosed'),
+    ParseError,
+    "Unclosed quote",
+  );
+  // Trailing backslash inside double quote also counts as unclosed
+  assertThrows(
+    () => splitArgs('echo "foo\\'),
+    ParseError,
+    "Unclosed quote",
+  );
+});
+
+Deno.test("splitArgs: unclosed single quote", () => {
+  assertThrows(
+    () => splitArgs("echo 'unclosed"),
+    ParseError,
+    "Unclosed quote",
+  );
+  // Trailing backslash inside single quote also counts as unclosed
+  assertThrows(
+    () => splitArgs("echo 'foo\\"),
+    ParseError,
+    "Unclosed quote",
+  );
+});
+
+Deno.test("splitArgs: mixed quotes", () => {
+  assertEquals(
+    splitArgs(`echo "foo'bar" 'baz"qux'`),
+    ["echo", "foo'bar", 'baz"qux'],
+  );
+});
+
+Deno.test("splitArgs: consecutive backslashes", () => {
+  assertEquals(splitArgs('echo "\\\\"'), ["echo", "\\"]);
+  assertEquals(splitArgs('echo "\\\\\\\\"'), ["echo", "\\\\"]);
+});
+
+Deno.test("splitArgs: escaped spaces", () => {
+  assertEquals(splitArgs("echo foo\\ bar"), ["echo", "foo bar"]);
+});
+
+Deno.test("splitArgs: complex escaping", () => {
+  assertEquals(
+    splitArgs('cmd "arg with \\"quotes\\"" \'single\\\'s\''),
+    ["cmd", 'arg with "quotes"', "single's"],
+  );
+});
+
+Deno.test("splitArgs: empty quotes", () => {
+  assertEquals(splitArgs("echo \"\" ''"), ["echo", "", ""]);
+});
+
+Deno.test("splitArgs: escape sequences", () => {
+  assertEquals(splitArgs('echo "line1\\nline2"'), ["echo", "line1\nline2"]);
+  assertEquals(splitArgs('echo "tab\\there"'), ["echo", "tab\there"]);
 });
