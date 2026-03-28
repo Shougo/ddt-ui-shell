@@ -88,6 +88,10 @@ type SendParams = {
   str: string;
 };
 
+type SetPrompt = {
+  str: string;
+};
+
 type BuiltinCommand = {
   description: string;
   callback: BuiltinCallback;
@@ -417,6 +421,20 @@ export class Ui extends BaseUi<Params> {
           args.uiParams,
           params.str,
         );
+      },
+    },
+    setPrompt: {
+      description: "Set the prompt string",
+      callback: async (args: {
+        denops: Denops;
+        options: DdtOptions;
+        uiOptions: UiOptions;
+        uiParams: Params;
+        actionParams: BaseParams;
+      }) => {
+        const params = args.actionParams as SetPrompt;
+
+        await this.#newPrompt(args.denops, args.uiParams, params.str);
       },
     },
     terminate: {

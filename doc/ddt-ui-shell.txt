@@ -90,6 +90,13 @@ send
 
 		Send {str} to the process and execute.
 
+                                               *ddu-ui-shell-action-setPrompt*
+setPrompt
+		params:
+			{str}: Target string.
+
+		Send {str} to the prompt.
+
 ------------------------------------------------------------------------------
 PARAMS                                                   *ddt-ui-shell-params*
 
