@@ -695,17 +695,16 @@ export class Ui extends BaseUi<Params> {
 
     await this.#updatePrompt(denops, params.prompt + " ");
 
-    let promptLines: string[] = [];
-    const userPrompts = params.userPrompt.length !== 0
-      ? (await denops.eval(params.userPrompt) as string).split("\n")
-      : [];
-    promptLines = [
-      ...promptLines,
+    const [userPrompts, lastLine] = await Promise.all([
+      params.userPrompt.length !== 0
+        ? denops.eval(params.userPrompt).then((r) => (r as string).split("\n"))
+        : Promise.resolve([] as string[]),
+      fn.getbufoneline(denops, this.#bufNr, "$"),
+    ]);
+    const promptLines = [
       ...userPrompts,
       `${params.prompt} ${commandLine}`,
     ];
-
-    const lastLine = await fn.getbufoneline(denops, this.#bufNr, "$");
     if (lastLine === params.prompt + " ") {
       const userPromptPos = await searchUserPrompt(
         denops,
@@ -836,18 +835,17 @@ export class Ui extends BaseUi<Params> {
     cwd: string,
     promptPattern: string,
   ) {
-    await vars.b.set(denops, "ddt_ui_name", name);
-    await vars.b.set(denops, "ddt_ui_shell_prompt_pattern", promptPattern);
+    const winId = await fn.win_getid(denops);
+    await batch(denops, async (denops: Denops) => {
+      await vars.b.set(denops, "ddt_ui_name", name);
+      await vars.b.set(denops, "ddt_ui_shell_prompt_pattern", promptPattern);
 
-    await vars.t.set(denops, "ddt_ui_last_bufnr", this.#bufNr);
-    await vars.t.set(denops, "ddt_ui_last_directory", cwd);
-    await vars.t.set(denops, "ddt_ui_shell_last_name", name);
+      await vars.t.set(denops, "ddt_ui_last_bufnr", this.#bufNr);
+      await vars.t.set(denops, "ddt_ui_last_directory", cwd);
+      await vars.t.set(denops, "ddt_ui_shell_last_name", name);
 
-    await vars.g.set(
-      denops,
-      "ddt_ui_last_winid",
-      await fn.win_getid(denops),
-    );
+      await vars.g.set(denops, "ddt_ui_last_winid", winId);
+    });
   }
 
   async #resolveParams(
@@ -913,7 +911,7 @@ export class Ui extends BaseUi<Params> {
   }
 
   async #newCdPrompt(denops: Denops, params: Params, directory: string) {
-    const quote = await fn.has(denops, "win32") ? '"' : "'";
+    const quote = Deno.build.os === "windows" ? '"' : "'";
     const commandLine = `cd ${quote}${directory}${quote}`;
     await this.#newPrompt(denops, params, commandLine);
 
@@ -1349,11 +1347,14 @@ async function getCommandLine(
   lineNr: "." | number = ".",
 ) {
   const currentLine = await fn.getline(denops, lineNr);
-  if (
-    !currentLine.match(promptPattern) &&
-    await fn.line(denops, ".") !== await fn.line(denops, "$")
-  ) {
-    return "";
+  if (!currentLine.match(promptPattern)) {
+    const [dotLine, dollarLine] = await Promise.all([
+      fn.line(denops, "."),
+      fn.line(denops, "$"),
+    ]);
+    if (dotLine !== dollarLine) {
+      return "";
+    }
   }
 
   const substitute = await fn.substitute(
