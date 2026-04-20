@@ -1029,7 +1029,7 @@ export class Ui extends BaseUi<Params> {
       message,
     );
 
-    this.#updatePrompt(
+    await this.#updatePrompt(
       denops,
       await fn.getbufoneline(denops, this.#bufNr, "$"),
     );
@@ -1054,10 +1054,10 @@ export class Ui extends BaseUi<Params> {
     // Get all lines.
     const bufLines: string[] = [];
 
+    const encoder = new TextEncoder();
+
     for await (const data of this.#pty.readable) {
       debugLog(options, `data = "${data}"`);
-
-      await this.#moveCursorLast(denops);
 
       type ANSIHighlight = {
         highlight: string;
@@ -1205,11 +1205,11 @@ export class Ui extends BaseUi<Params> {
                 ...highlight,
                 row: currentLineNr,
                 col: currentCol,
-                length: await fn.len(denops, annotation.text),
+                length: encoder.encode(annotation.text).length,
               });
             }
 
-            currentCol = await fn.len(denops, currentText) + 1;
+            currentCol = encoder.encode(currentText).length + 1;
           }
         }
 
@@ -1240,7 +1240,7 @@ export class Ui extends BaseUi<Params> {
         }
       });
 
-      this.#updatePrompt(
+      await this.#updatePrompt(
         denops,
         await fn.getbufoneline(denops, this.#bufNr, "$"),
       );

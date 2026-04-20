@@ -70,10 +70,10 @@ export async function parseCommandLineWithEnv(
   }
 
   const remaining = tokens.slice(i);
-  let resultArgs: string[] = [];
+  const resultArgs: string[] = [];
   for (const arg of remaining) {
     const expanded = await expandArg(cwd, arg);
-    resultArgs = [...resultArgs, ...expanded];
+    resultArgs.push(...expanded);
   }
 
   return { env, args: resultArgs };
@@ -219,19 +219,9 @@ async function expandArg(
   cwd: string,
   arg: string,
 ): Promise<string[]> {
-  let expanded = "";
-
-  for (const c of arg) {
-    if (expanded.length === 0 && c === "~") {
-      // Replace home directory
-      const home = Deno.env.get("HOME");
-      if (home) {
-        expanded += home;
-      }
-    } else {
-      expanded += c;
-    }
-  }
+  const expanded = arg.startsWith("~")
+    ? (Deno.env.get("HOME") ?? "~") + arg.slice(1)
+    : arg;
 
   if (
     expanded.includes("*") || expanded.includes("?") || expanded.includes("[")
