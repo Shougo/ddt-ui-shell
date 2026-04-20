@@ -698,7 +698,7 @@ export class Ui extends BaseUi<Params> {
     const [userPrompts, lastLine] = await Promise.all([
       params.userPrompt.length !== 0
         ? denops.eval(params.userPrompt).then((r) => (r as string).split("\n"))
-        : Promise.resolve([] as string[]),
+        : Promise.resolve([]),
       fn.getbufoneline(denops, this.#bufNr, "$"),
     ]);
     const promptLines = [
