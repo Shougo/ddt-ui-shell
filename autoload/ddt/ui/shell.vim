@@ -70,6 +70,19 @@ function ddt#ui#shell#_check_prompt() abort
   endif
 endfunction
 
+function ddt#ui#shell#_apply_highlights(highlights) abort
+  for hl in a:highlights
+    call ddt#ui#shell#_highlight(
+          \ hl.highlight,
+          \ hl.name,
+          \ hl.priority,
+          \ hl.bufnr,
+          \ hl.row,
+          \ hl.col,
+          \ hl.length)
+  endfor
+endfunction
+
 function ddt#ui#shell#_highlight(
       \ highlight, prop_type, priority, bufnr, row, col, length) abort
 
