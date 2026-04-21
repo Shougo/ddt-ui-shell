@@ -1074,11 +1074,7 @@ export class Ui extends BaseUi<Params> {
     for await (const data of this.#pty.readable) {
       debugLog(options, `data = "${data}"`);
 
-      type CurrentHighlight = {
-        highlight: string;
-        name: string;
-        priority: number;
-      };
+      type CurrentHighlight = Pick<ANSIHighlight, "highlight" | "name" | "priority">;
 
       for (const line of data.split(/\r*\n/)) {
         if (line.length === 0) {
@@ -1270,11 +1266,14 @@ export class Ui extends BaseUi<Params> {
   }
 
   async #flushOutput(denops: Denops) {
-    if (this.#outputQueue.length === 0 && this.#pendingHighlights.length === 0) {
+    const hasOutput = this.#outputQueue.length > 0;
+    const hasHighlights = this.#pendingHighlights.length > 0;
+
+    if (!hasOutput && !hasHighlights) {
       return;
     }
 
-    if (this.#outputQueue.length > 0) {
+    if (hasOutput) {
       await fn.setbufline(
         denops,
         this.#bufNr,
@@ -1283,7 +1282,7 @@ export class Ui extends BaseUi<Params> {
       );
     }
 
-    if (this.#pendingHighlights.length > 0) {
+    if (hasHighlights) {
       const highlights = this.#pendingHighlights;
       this.#pendingHighlights = [];
       await denops.call("ddt#ui#shell#_apply_highlights", highlights);
