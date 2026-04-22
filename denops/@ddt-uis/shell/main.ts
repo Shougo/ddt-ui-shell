@@ -139,7 +139,6 @@ export class Ui extends BaseUi<Params> {
   #outputQueue: string[] = [];
   #pendingHighlights: ANSIHighlight[] = [];
   #flushTimer: number | null = null;
-  #encoder: TextEncoder = new TextEncoder();
   #promptLineNr: LineNumber = 0;
 
   override async redraw(args: {
@@ -1212,11 +1211,11 @@ export class Ui extends BaseUi<Params> {
                 bufnr: this.#bufNr,
                 row: currentLineNr,
                 col: currentCol,
-                length: this.#encoder.encode(annotation.text).length,
+                length: encoder.encode(annotation.text).length,
               });
             }
 
-            currentCol = this.#encoder.encode(currentText).length + 1;
+            currentCol = encoder.encode(currentText).length + 1;
           }
         }
 
@@ -1487,8 +1486,11 @@ async function trimHistory(
       return;
     }
 
-    // Remove consecutive duplicates, then keep only the last maxEntries lines.
-    const deduped = lines.filter((line, index, array) => {
+    // Slice to the most-recent 2×maxEntries candidates first to reduce the
+    // work done by the deduplication pass, then deduplicate consecutive
+    // entries and keep only the last maxEntries lines.
+    const candidates = lines.slice(-(maxEntries * 2));
+    const deduped = candidates.filter((line, index, array) => {
       return index === 0 || line !== array[index - 1];
     });
     const trimmed = deduped.slice(-maxEntries);
@@ -1496,7 +1498,13 @@ async function trimHistory(
     // Write to a temporary file first, then rename for atomicity.
     const tmpPath = historyPath + ".tmp";
     await Deno.writeTextFile(tmpPath, trimmed.join("\n") + "\n");
-    await Deno.rename(tmpPath, historyPath);
+    try {
+      await Deno.rename(tmpPath, historyPath);
+    } catch (renameError) {
+      // Clean up the temporary file so it does not accumulate.
+      await Deno.remove(tmpPath).catch(() => {});
+      throw renameError;
+    }
   } catch (error) {
     // Trim failures are non-fatal; the history file remains usable.
     console.error("ddt-ui-shell: history trim error:", error);
