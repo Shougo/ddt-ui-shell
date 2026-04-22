@@ -41,6 +41,16 @@ type LineNumber = number;
  */
 type ColumnNumber = number;
 
+type ANSIHighlight = {
+  highlight: string;
+  name: string;
+  priority: number;
+  bufnr: number;
+  row: LineNumber;
+  col: ColumnNumber;
+  length: ByteLength;
+};
+
 function debugLog(options: { debug?: boolean }, ...args: unknown[]): void {
   if (options.debug) {
     console.log(...args);
@@ -123,6 +133,12 @@ export class Ui extends BaseUi<Params> {
   #startTime: number | null = null;
   #bufferStack: string[] = [];
   #with: string[] = [];
+  #outputQueue: string[] = [];
+  #pendingHighlights: ANSIHighlight[] = [];
+  #flushTimer: number | null = null;
+  #encoder: TextEncoder = new TextEncoder();
+  readonly #flushIntervalMs = 100;
+  #promptLineNr: LineNumber = 0;
 
   override async redraw(args: {
     denops: Denops;
@@ -695,12 +711,15 @@ export class Ui extends BaseUi<Params> {
 
     await this.#updatePrompt(denops, params.prompt + " ");
 
-    const [userPrompts, lastLine] = await Promise.all([
+    const [userPrompts, allBufLines] = await Promise.all([
       params.userPrompt.length !== 0
         ? denops.eval(params.userPrompt).then((r) => (r as string).split("\n"))
         : Promise.resolve([]),
-      fn.getbufoneline(denops, this.#bufNr, "$"),
+      fn.getbufline(denops, this.#bufNr, 1, "$") as Promise<string[]>,
     ]);
+    const lastLine = allBufLines.length > 0
+      ? allBufLines[allBufLines.length - 1]
+      : "";
     const promptLines = [
       ...userPrompts,
       `${params.prompt} ${commandLine}`,
@@ -709,7 +728,7 @@ export class Ui extends BaseUi<Params> {
       const userPromptPos = await searchUserPrompt(
         denops,
         params.userPromptPattern,
-        (await fn.getbufline(denops, this.#bufNr, 1, "$")).length - 1,
+        allBufLines.length - 1,
       );
 
       if (userPromptPos > 0) {
@@ -1044,29 +1063,21 @@ export class Ui extends BaseUi<Params> {
 
     const passwordRegex = new RegExp(uiParams.passwordPattern);
 
-    let currentLineNr: LineNumber =
+    this.#promptLineNr =
       (await fn.getbufline(denops, this.#bufNr, 1, "$")).length;
+    let currentLineNr: LineNumber = this.#promptLineNr;
 
-    const promptLineNr = currentLineNr;
-
-    // Get all lines.
-    const bufLines: string[] = [];
-
-    const encoder = new TextEncoder();
+    // Reset output buffers for this command run.
+    this.#outputQueue = [];
+    this.#pendingHighlights = [];
 
     for await (const data of this.#pty.readable) {
       debugLog(options, `data = "${data}"`);
 
-      type ANSIHighlight = {
-        highlight: string;
-        name: string;
-        priority: number;
-        row: LineNumber;
-        col: ColumnNumber;
-        length: ByteLength;
-      };
-
-      const ansiHighlights: ANSIHighlight[] = [];
+      type CurrentHighlight = Pick<
+        ANSIHighlight,
+        "highlight" | "name" | "priority"
+      >;
 
       for (const line of data.split(/\r*\n/)) {
         if (line.length === 0) {
@@ -1081,17 +1092,11 @@ export class Ui extends BaseUi<Params> {
 
         currentLineNr += 1;
         let currentCol: ColumnNumber = 1;
-        const currentIndex = currentLineNr - promptLineNr;
-        let currentText = currentIndex < bufLines.length
-          ? bufLines[currentIndex]
+        const currentIndex = currentLineNr - this.#promptLineNr;
+        let currentText = currentIndex < this.#outputQueue.length
+          ? this.#outputQueue[currentIndex]
           : "";
-        debugLog(options, bufLines);
-
-        type CurrentHighlight = {
-          highlight: string;
-          name: string;
-          priority: number;
-        };
+        debugLog(options, this.#outputQueue);
 
         const currentHighlights: CurrentHighlight[] = [];
         let overwrite = false;
@@ -1199,58 +1204,58 @@ export class Ui extends BaseUi<Params> {
 
             // Add highlights
             for (const highlight of currentHighlights) {
-              ansiHighlights.push({
+              this.#pendingHighlights.push({
                 ...highlight,
+                bufnr: this.#bufNr,
                 row: currentLineNr,
                 col: currentCol,
-                length: encoder.encode(annotation.text).length,
+                length: this.#encoder.encode(annotation.text).length,
               });
             }
 
-            currentCol = encoder.encode(currentText).length + 1;
+            currentCol = this.#encoder.encode(currentText).length + 1;
           }
         }
 
-        if (overwrite && bufLines.length > 0) {
-          bufLines[bufLines.length - 1] = currentText;
+        if (overwrite && this.#outputQueue.length > 0) {
+          this.#outputQueue[this.#outputQueue.length - 1] = currentText;
         } else {
           // Append new line.
           debugLog(options, `push: ${currentText}`);
 
-          bufLines.push(currentText);
+          this.#outputQueue.push(currentText);
         }
       }
 
-      await fn.setbufline(denops, this.#bufNr, promptLineNr + 1, bufLines);
-
-      await batch(denops, async (denops: Denops) => {
-        for (const highlight of ansiHighlights) {
-          await denops.call(
-            "ddt#ui#shell#_highlight",
-            highlight.highlight,
-            highlight.name,
-            highlight.priority,
-            this.#bufNr,
-            highlight.row,
-            highlight.col,
-            highlight.length,
-          );
-        }
-      });
-
-      await this.#updatePrompt(
-        denops,
-        await fn.getbufoneline(denops, this.#bufNr, "$"),
-      );
-
-      await this.#moveCursorLast(denops);
+      // Schedule a periodic flush if not already pending.
+      if (this.#flushTimer === null) {
+        this.#flushTimer = setTimeout(() => {
+          this.#flushTimer = null;
+          this.#flushOutput(denops).catch((e) => {
+            console.error("ddt-ui-shell: flush error:", e);
+          });
+        }, this.#flushIntervalMs);
+      }
 
       if (passwordRegex.exec(data)) {
+        // Flush immediately before asking for password.
+        if (this.#flushTimer !== null) {
+          clearTimeout(this.#flushTimer);
+          this.#flushTimer = null;
+        }
+        await this.#flushOutput(denops);
         // NOTE: Move the cursor to make the output more visible.
         await denops.cmd("normal! zz");
         this.#pty.write(`${await fn.inputsecret(denops, "Password: ")}\n`);
       }
     }
+
+    // Cancel any pending timer and flush remaining output.
+    if (this.#flushTimer !== null) {
+      clearTimeout(this.#flushTimer);
+      this.#flushTimer = null;
+    }
+    await this.#flushOutput(denops);
 
     // Print exit code
     if (this.#pty?.exitCode && this.#pty.exitCode != 0) {
@@ -1259,6 +1264,37 @@ export class Ui extends BaseUi<Params> {
         `ddt-ui-shell: exit ${this.#pty.exitCode ?? ""}`,
       );
     }
+
+    await this.#moveCursorLast(denops);
+  }
+
+  async #flushOutput(denops: Denops) {
+    const hasOutput = this.#outputQueue.length > 0;
+    const hasHighlights = this.#pendingHighlights.length > 0;
+
+    if (!hasOutput && !hasHighlights) {
+      return;
+    }
+
+    if (hasOutput) {
+      await fn.setbufline(
+        denops,
+        this.#bufNr,
+        this.#promptLineNr + 1,
+        this.#outputQueue,
+      );
+    }
+
+    if (hasHighlights) {
+      const highlights = this.#pendingHighlights;
+      this.#pendingHighlights = [];
+      await denops.call("ddt#ui#shell#_apply_highlights", highlights);
+    }
+
+    await this.#updatePrompt(
+      denops,
+      await fn.getbufoneline(denops, this.#bufNr, "$"),
+    );
 
     await this.#moveCursorLast(denops);
   }
