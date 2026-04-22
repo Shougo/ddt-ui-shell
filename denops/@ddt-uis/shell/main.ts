@@ -57,6 +57,8 @@ function debugLog(options: { debug?: boolean }, ...args: unknown[]): void {
   }
 }
 
+const encoder = new TextEncoder();
+
 export type ANSIColorHighlights = {
   bgs?: string[];
   bold?: string;
@@ -71,6 +73,7 @@ export type Params = {
   cwd: string;
   exprParams: (keyof Params)[];
   floatingBorder: string;
+  flushIntervalMs: number;
   noSaveHistoryCommands: string[];
   passwordPattern: string;
   prompt: string;
@@ -137,7 +140,6 @@ export class Ui extends BaseUi<Params> {
   #pendingHighlights: ANSIHighlight[] = [];
   #flushTimer: number | null = null;
   #encoder: TextEncoder = new TextEncoder();
-  readonly #flushIntervalMs = 100;
   #promptLineNr: LineNumber = 0;
 
   override async redraw(args: {
@@ -486,6 +488,7 @@ export class Ui extends BaseUi<Params> {
         "winWidth",
       ],
       floatingBorder: "",
+      flushIntervalMs: 100,
       noSaveHistoryCommands: [],
       passwordPattern: "(Enter |Repeat |[Oo]ld |[Nn]ew |login " +
         "|Kerberos |EncFS |CVS |UNIX | SMB |LDAP |\\[sudo\\] )" +
@@ -1234,7 +1237,7 @@ export class Ui extends BaseUi<Params> {
           this.#flushOutput(denops).catch((e) => {
             console.error("ddt-ui-shell: flush error:", e);
           });
-        }, this.#flushIntervalMs);
+        }, uiParams.flushIntervalMs);
       }
 
       if (passwordRegex.exec(data)) {
@@ -1263,9 +1266,9 @@ export class Ui extends BaseUi<Params> {
         denops,
         `ddt-ui-shell: exit ${this.#pty.exitCode ?? ""}`,
       );
+      // Move cursor after appending the exit-code message.
+      await this.#moveCursorLast(denops);
     }
-
-    await this.#moveCursorLast(denops);
   }
 
   async #flushOutput(denops: Denops) {
@@ -1451,13 +1454,52 @@ async function appendHistory(
   ) as string;
 
   try {
-    let history = await getHistory(denops, params);
-    history.push(commandLine);
-    history = history.slice(-params.shellHistoryMax);
-    await Deno.writeTextFile(historyPath, history.join("\n"));
+    // Append the new command directly (fast path — avoids reading the whole file).
+    const file = await Deno.open(historyPath, {
+      append: true,
+      create: true,
+      write: true,
+    });
+    try {
+      await file.write(encoder.encode(commandLine + "\n"));
+    } finally {
+      file.close();
+    }
+
+    // Trim the history file down to shellHistoryMax entries when it has grown
+    // beyond the limit.  The trim is done atomically via a temporary file so
+    // that a crash cannot leave a corrupted history file.
+    await trimHistory(historyPath, params.shellHistoryMax);
   } catch (error) {
-    printError(denops, "Error reading history file:", error);
-    throw error;
+    printError(denops, "Error appending to history file:", error);
+  }
+}
+
+async function trimHistory(
+  historyPath: string,
+  maxEntries: number,
+): Promise<void> {
+  try {
+    const content = await Deno.readTextFile(historyPath);
+    const lines = content.split("\n").filter((line) => line.trim() !== "");
+
+    if (lines.length <= maxEntries) {
+      return;
+    }
+
+    // Remove consecutive duplicates, then keep only the last maxEntries lines.
+    const deduped = lines.filter((line, index, array) => {
+      return index === 0 || line !== array[index - 1];
+    });
+    const trimmed = deduped.slice(-maxEntries);
+
+    // Write to a temporary file first, then rename for atomicity.
+    const tmpPath = historyPath + ".tmp";
+    await Deno.writeTextFile(tmpPath, trimmed.join("\n") + "\n");
+    await Deno.rename(tmpPath, historyPath);
+  } catch (error) {
+    // Trim failures are non-fatal; the history file remains usable.
+    console.error("ddt-ui-shell: history trim error:", error);
   }
 }
 
@@ -1548,4 +1590,30 @@ Deno.test("extractLastOverwriteContent()", () => {
     ),
     "\x1b[0G\x1b[0G⠹ Fetching updates\x1b[0G",
   );
+});
+
+Deno.test("trimHistory(): does not trim when within limit", async () => {
+  const tmpFile = await Deno.makeTempFile();
+  try {
+    await Deno.writeTextFile(tmpFile, "cmd1\ncmd2\ncmd3\n");
+    await trimHistory(tmpFile, 10);
+    const content = await Deno.readTextFile(tmpFile);
+    assertEquals(content, "cmd1\ncmd2\ncmd3\n");
+  } finally {
+    await Deno.remove(tmpFile);
+  }
+});
+
+Deno.test("trimHistory(): trims and deduplicates when over limit", async () => {
+  const tmpFile = await Deno.makeTempFile();
+  try {
+    // 6 entries with a consecutive duplicate; limit is 3
+    await Deno.writeTextFile(tmpFile, "a\nb\nb\nc\nd\ne\n");
+    await trimHistory(tmpFile, 3);
+    const content = await Deno.readTextFile(tmpFile);
+    // After dedup: a b c d e (5 entries), then slice last 3 → c d e
+    assertEquals(content, "c\nd\ne\n");
+  } finally {
+    await Deno.remove(tmpFile);
+  }
 });
