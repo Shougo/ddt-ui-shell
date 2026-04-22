@@ -1074,7 +1074,10 @@ export class Ui extends BaseUi<Params> {
     for await (const data of this.#pty.readable) {
       debugLog(options, `data = "${data}"`);
 
-      type CurrentHighlight = Pick<ANSIHighlight, "highlight" | "name" | "priority">;
+      type CurrentHighlight = Pick<
+        ANSIHighlight,
+        "highlight" | "name" | "priority"
+      >;
 
       for (const line of data.split(/\r*\n/)) {
         if (line.length === 0) {
