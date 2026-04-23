@@ -135,6 +135,16 @@ cwd		string
 
 		Default: Use |getcwd()| value
 
+                                          *ddt-ui-shell-param-flushIntervalMs*
+flushIntervalMs	number
+		Sets the interval in milliseconds between periodic buffer
+		flushes during PTY output.  A lower value reduces display
+		latency at the cost of more frequent Vim/Neovim RPC calls; a
+		higher value batches more output per flush and reduces RPC
+		overhead.
+
+		Default: 100
+
                                     *ddt-ui-shell-param-noSaveHistoryCommands*
 noSaveHistoryCommands	string[]
 		It prevents the commands listed from being saved in the
