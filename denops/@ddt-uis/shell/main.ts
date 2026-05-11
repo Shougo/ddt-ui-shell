@@ -250,7 +250,6 @@ export class Ui extends BaseUi<Params> {
           this.#prompt,
         );
 
-        console.log(`commandLine = ${commandLine}`);
         if (commandLine.length === 0) {
           // Check <cfile> is directory.
           const expandedCfile = await expandDirectory(
