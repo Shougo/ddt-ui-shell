@@ -250,6 +250,7 @@ export class Ui extends BaseUi<Params> {
           this.#prompt,
         );
 
+        console.log(`commandLine = ${commandLine}`);
         if (commandLine.length === 0) {
           // Check <cfile> is directory.
           const expandedCfile = await expandDirectory(
@@ -264,7 +265,8 @@ export class Ui extends BaseUi<Params> {
         }
 
         if (
-          await fn.line(args.denops, ".") !== await fn.line(args.denops, "$")
+          await fn.line(args.denops, ".") !== await fn.line(args.denops, "$") ||
+          commandLine.length === 0
         ) {
           // History execution.
           await this.#newPrompt(args.denops, args.uiParams, commandLine);
