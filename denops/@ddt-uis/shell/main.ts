@@ -799,22 +799,21 @@ export class Ui extends BaseUi<Params> {
   }
 
   async #moveCursorLast(denops: Denops) {
-    if (await fn.bufnr(denops) !== this.#bufNr) {
-      // NOTE: It is not ddt-ui-shell buffer.
-      await denops.cmd("stopinsert");
+    const winId = await this.#winId(denops);
+    if (winId < 0) {
+      // Shell window is not visible; nothing to do.
       return;
     }
 
-    await fn.cursor(
+    // Use win_execute so the cursor is positioned in the shell window even
+    // when the user has focused a different window.  The entire move is
+    // evaluated atomically on the Vim/Neovim side (single RPC round-trip),
+    // which also eliminates the TOCTOU that existed when line("$") and
+    // col("$") were queried in two separate awaited RPC calls.
+    await fn.win_execute(
       denops,
-      await fn.line(denops, "$"),
-      1,
-    );
-
-    await fn.cursor(
-      denops,
-      0,
-      await fn.col(denops, "$") + 1,
+      winId,
+      'call cursor(line("$"), col([line("$"), "$"]) + 1)',
     );
   }
 
