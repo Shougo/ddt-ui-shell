@@ -802,6 +802,7 @@ export class Ui extends BaseUi<Params> {
     const winId = await this.#winId(denops);
     if (winId < 0) {
       // Shell window is not visible; nothing to do.
+      await denops.cmd("stopinsert");
       return;
     }
 
