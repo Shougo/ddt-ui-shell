@@ -138,7 +138,7 @@ export class Ui extends BaseUi<Params> {
   #with: string[] = [];
   #outputQueue: string[] = [];
   #pendingHighlights: ANSIHighlight[] = [];
-  #flushTimer: number | null = null;
+  #flushTimer: ReturnType<typeof setTimeout> | null = null;
   #promptLineNr: LineNumber = 0;
 
   override async redraw(args: {
