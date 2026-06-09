@@ -1569,9 +1569,12 @@ function extractLastOverwriteContent(line: string): string {
 }
 
 function isProgressOverwriteLine(prev: string, next: string): boolean {
+  if (!isProgressLikeLine(prev) || !isProgressLikeLine(next)) {
+    return false;
+  }
+
   const prevNorm = normalizeProgressLine(prev);
   const nextNorm = normalizeProgressLine(next);
-
   if (prevNorm === "" || nextNorm === "") {
     return false;
   }
@@ -1580,19 +1583,70 @@ function isProgressOverwriteLine(prev: string, next: string): boolean {
     return false;
   }
 
-  return /\b(?:counting|compressing|writing|receiving|resolving|enumerating|fetching)\b/i
-    .test(
-      prev,
-    );
+  const prefixLen = commonPrefixLength(prev, next);
+  const minLen = Math.min(prev.length, next.length);
+
+  // Require a long shared prefix so we only overwrite lines that are clearly
+  // the same progress line with changing counters/percentages.
+  return prefixLen >= Math.max(12, Math.floor(minLen * 0.7));
+}
+
+const PROGRESS_LIKE_PATTERNS = [
+  /\bprogress\b/i,
+  /\bdownloading\b/i,
+  /\buploading\b/i,
+  /\bprocessing\b/i,
+  /\bwriting\b/i,
+  /\breceiving\b/i,
+  /\bresolving\b/i,
+  /\benumerating\b/i,
+  /\bcounting\b/i,
+  /\bcompressing\b/i,
+  /\bfetching\b/i,
+  /\bstep\b/i,
+  /\bchunk\b/i,
+  /\bcopying\b/i,
+  /\bsyncing\b/i,
+  /\bbuilding\b/i,
+  /\binstalling\b/i,
+  /\btesting\b/i,
+  /\bverifying\b/i,
+  /\bextracting\b/i,
+  /\btransferring\b/i,
+  /\bloading\b/i,
+  /\bsaving\b/i,
+  /\bupdating\b/i,
+] as const;
+
+function isProgressLikeLine(line: string): boolean {
+  if (!/[\d%]/.test(line)) {
+    return false;
+  }
+
+  return PROGRESS_LIKE_PATTERNS.some((pattern) => pattern.test(line)) ||
+    /\d+%/.test(line) ||
+    /\d+\/\d+/.test(line) ||
+    /\d+ of \d+/i.test(line);
 }
 
 function normalizeProgressLine(line: string): string {
   return line
     .replace(/\b\d+%\b/g, "%")
     .replace(/\b\d+\/\d+\b/g, "#/#")
+    .replace(/\b\d+ of \d+\b/gi, "# of #")
     .replace(/\b\d+\b/g, "#")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function commonPrefixLength(a: string, b: string): number {
+  const max = Math.min(a.length, b.length);
+  for (let i = 0; i < max; i += 1) {
+    if (a[i] !== b[i]) {
+      return i;
+    }
+  }
+  return max;
 }
 
 Deno.test("transformAnnotations()", () => {
