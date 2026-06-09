@@ -1221,15 +1221,13 @@ export class Ui extends BaseUi<Params> {
         }
 
         const prevLine = this.#outputQueue[this.#outputQueue.length - 1];
-        const progressOverwrite = !overwrite && prevLine !== undefined &&
-          shouldOverwriteProgressLine(prevLine, currentText);
+        const progressOverwrite = !overwrite &&
+          prevLine !== undefined &&
+          isProgressOverwriteLine(prevLine, currentText);
 
         if ((overwrite || progressOverwrite) && this.#outputQueue.length > 0) {
           this.#outputQueue[this.#outputQueue.length - 1] = currentText;
         } else {
-          // Append new line.
-          debugLog(options, `push: ${currentText}`);
-
           this.#outputQueue.push(currentText);
         }
       }
@@ -1570,22 +1568,31 @@ function extractLastOverwriteContent(line: string): string {
   return line.slice(lastMatch.index);
 }
 
-function shouldOverwriteProgressLine(prev: string, next: string): boolean {
-  if (prev === next) {
-    return true;
-  }
+function isProgressOverwriteLine(prev: string, next: string): boolean {
+  const prevNorm = normalizeProgressLine(prev);
+  const nextNorm = normalizeProgressLine(next);
 
-  const normalizedPrev = prev.replace(/\d+/g, "#");
-  const normalizedNext = next.replace(/\d+/g, "#");
-  if (normalizedPrev !== normalizedNext) {
+  if (prevNorm === "" || nextNorm === "") {
     return false;
   }
 
-  // Heuristic: treat progress-like lines as overwrite candidates.
-  return /%|\b(eta|time|done|remaining|writing|counting|compressing|enumerating)\b/i
-    .test(prev) ||
-    /%|\b(eta|time|done|remaining|writing|counting|compressing|enumerating)\b/i
-      .test(next);
+  if (prevNorm !== nextNorm) {
+    return false;
+  }
+
+  return /\b(?:counting|compressing|writing|receiving|resolving|enumerating|fetching)\b/i
+    .test(
+      prev,
+    );
+}
+
+function normalizeProgressLine(line: string): string {
+  return line
+    .replace(/\b\d+%\b/g, "%")
+    .replace(/\b\d+\/\d+\b/g, "#/#")
+    .replace(/\b\d+\b/g, "#")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 Deno.test("transformAnnotations()", () => {
