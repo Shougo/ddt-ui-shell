@@ -1220,7 +1220,11 @@ export class Ui extends BaseUi<Params> {
           }
         }
 
-        if (overwrite && this.#outputQueue.length > 0) {
+        const prevLine = this.#outputQueue[this.#outputQueue.length - 1];
+        const progressOverwrite = !overwrite && prevLine !== undefined &&
+          shouldOverwriteProgressLine(prevLine, currentText);
+
+        if ((overwrite || progressOverwrite) && this.#outputQueue.length > 0) {
           this.#outputQueue[this.#outputQueue.length - 1] = currentText;
         } else {
           // Append new line.
@@ -1564,6 +1568,24 @@ function extractLastOverwriteContent(line: string): string {
     return line;
   }
   return line.slice(lastMatch.index);
+}
+
+function shouldOverwriteProgressLine(prev: string, next: string): boolean {
+  if (prev === next) {
+    return true;
+  }
+
+  const normalizedPrev = prev.replace(/\d+/g, "#");
+  const normalizedNext = next.replace(/\d+/g, "#");
+  if (normalizedPrev !== normalizedNext) {
+    return false;
+  }
+
+  // Heuristic: treat progress-like lines as overwrite candidates.
+  return /%|\b(eta|time|done|remaining|writing|counting|compressing|enumerating)\b/i
+    .test(prev) ||
+    /%|\b(eta|time|done|remaining|writing|counting|compressing|enumerating)\b/i
+      .test(next);
 }
 
 Deno.test("transformAnnotations()", () => {
