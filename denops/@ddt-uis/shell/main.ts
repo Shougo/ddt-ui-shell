@@ -1220,12 +1220,14 @@ export class Ui extends BaseUi<Params> {
           }
         }
 
-        if (overwrite && this.#outputQueue.length > 0) {
+        const prevLine = this.#outputQueue[this.#outputQueue.length - 1];
+        const progressOverwrite = !overwrite &&
+          prevLine !== undefined &&
+          isProgressOverwriteLine(prevLine, currentText);
+
+        if ((overwrite || progressOverwrite) && this.#outputQueue.length > 0) {
           this.#outputQueue[this.#outputQueue.length - 1] = currentText;
         } else {
-          // Append new line.
-          debugLog(options, `push: ${currentText}`);
-
           this.#outputQueue.push(currentText);
         }
       }
@@ -1564,6 +1566,87 @@ function extractLastOverwriteContent(line: string): string {
     return line;
   }
   return line.slice(lastMatch.index);
+}
+
+function isProgressOverwriteLine(prev: string, next: string): boolean {
+  if (!isProgressLikeLine(prev) || !isProgressLikeLine(next)) {
+    return false;
+  }
+
+  const prevNorm = normalizeProgressLine(prev);
+  const nextNorm = normalizeProgressLine(next);
+  if (prevNorm === "" || nextNorm === "") {
+    return false;
+  }
+
+  if (prevNorm !== nextNorm) {
+    return false;
+  }
+
+  const prefixLen = commonPrefixLength(prev, next);
+  const minLen = Math.min(prev.length, next.length);
+
+  // Require a long shared prefix so we only overwrite lines that are clearly
+  // the same progress line with changing counters/percentages.
+  return prefixLen >= Math.max(12, Math.floor(minLen * 0.7));
+}
+
+const PROGRESS_LIKE_PATTERNS = [
+  /\bprogress\b/i,
+  /\bdownloading\b/i,
+  /\buploading\b/i,
+  /\bprocessing\b/i,
+  /\bwriting\b/i,
+  /\breceiving\b/i,
+  /\bresolving\b/i,
+  /\benumerating\b/i,
+  /\bcounting\b/i,
+  /\bcompressing\b/i,
+  /\bfetching\b/i,
+  /\bstep\b/i,
+  /\bchunk\b/i,
+  /\bcopying\b/i,
+  /\bsyncing\b/i,
+  /\bbuilding\b/i,
+  /\binstalling\b/i,
+  /\btesting\b/i,
+  /\bverifying\b/i,
+  /\bextracting\b/i,
+  /\btransferring\b/i,
+  /\bloading\b/i,
+  /\bsaving\b/i,
+  /\bupdating\b/i,
+] as const;
+
+function isProgressLikeLine(line: string): boolean {
+  if (!/[\d%]/.test(line)) {
+    return false;
+  }
+
+  return PROGRESS_LIKE_PATTERNS.some((pattern) => pattern.test(line)) ||
+    /\d+%/.test(line) ||
+    /\d+\/\d+/.test(line) ||
+    /\d+ of \d+/i.test(line);
+}
+
+function normalizeProgressLine(line: string): string {
+  return line
+    .replace(/\b\d+%\b/g, "%")
+    .replace(/\b\d+\/\d+\b/g, "#/#")
+    .replace(/\b\d+ of \d+\b/gi, "# of #")
+    .replace(/\b\d+\b/g, "#")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function commonPrefixLength(a: string, b: string): number {
+  const max = Math.min(a.length, b.length);
+  for (let i = 0; i < max; i += 1) {
+    if (a[i] !== b[i]) {
+      return i;
+    }
+  }
+  return max;
 }
 
 Deno.test("transformAnnotations()", () => {
