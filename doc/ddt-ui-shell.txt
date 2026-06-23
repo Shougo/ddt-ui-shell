@@ -40,57 +40,57 @@ INTERFACE                                             *ddt-ui-shell-interface*
 ------------------------------------------------------------------------------
 ACTIONS                                                 *ddt-ui-shell-actions*
 
-                                                      *ddu-ui-shell-action-cd*
+                                                      *ddt-ui-shell-action-cd*
 cd
 		params:
 			{directory}: New current directory.
 
 		Change current directory to {directory}.
 
-                                             *ddu-ui-shell-action-executeLine*
+                                             *ddt-ui-shell-action-executeLine*
 executeLine
 		Execute the command line.
 
-                                                  *ddu-ui-shell-action-insert*
+                                                  *ddt-ui-shell-action-insert*
 insert
 		params:
 			{str}: Target string.
 
 		Insert {str} to the process.
 
-                                               *ddu-ui-shell-action-terminate*
+                                               *ddt-ui-shell-action-terminate*
 terminate
 		Terminate the current command.
 
-                                              *ddu-ui-shell-action-nextPrompt*
+                                              *ddt-ui-shell-action-nextPrompt*
 nextPrompt
 		Move to the next prompt from cursor.
 
-                                             *ddu-ui-shell-action-pastePrompt*
+                                             *ddt-ui-shell-action-pastePrompt*
 pastePrompt
 		Paste the history to the command line.
 
-                                          *ddu-ui-shell-action-previousPrompt*
+                                          *ddt-ui-shell-action-previousPrompt*
 previousPrompt
 		Move to the previous prompt from cursor.
 
-                                         *ddu-ui-shell-action-pushBufferStack*
+                                         *ddt-ui-shell-action-pushBufferStack*
 pushBufferStack
 		Push the command line to buffer stack and clear the command
 		line.
 
-                                                  *ddu-ui-shell-action-redraw*
+                                                  *ddt-ui-shell-action-redraw*
 redraw
 		Redraw the UI prompt.
 
-                                                    *ddu-ui-shell-action-send*
+                                                    *ddt-ui-shell-action-send*
 send
 		params:
 			{str}: Target string.
 
 		Send {str} to the process and execute.
 
-                                               *ddu-ui-shell-action-setPrompt*
+                                               *ddt-ui-shell-action-setPrompt*
 setPrompt
 		params:
 			{str}: Target string.
@@ -274,29 +274,29 @@ t:ddt_ui_shell_last_name (string)
 ------------------------------------------------------------------------------
 Builtin Commands                                       *ddt-ui-shell-builtins*
 
-                                                     *ddu-ui-shell-builtin-cd*
+                                                     *ddt-ui-shell-builtin-cd*
 cd [{directory}]
 		params:
 			{directory}: New current directory.
 
 		Change current directory to {directory}.
 
-                                                *ddu-ui-shell-builtin-history*
+                                                *ddt-ui-shell-builtin-history*
 history
 		Print current history list.
 
-                                                   *ddu-ui-shell-builtin-time*
+                                                   *ddt-ui-shell-builtin-time*
 time {command-line}
 		Print executed time.
 
-                                                    *ddu-ui-shell-builtin-vim*
+                                                    *ddt-ui-shell-builtin-vim*
 vim {path}
 		params:
 			{path}: File path.
 
 		Edit {path} file.
 
-                                                   *ddu-ui-shell-builtin-with*
+                                                   *ddt-ui-shell-builtin-with*
 with {command-line}
 		Specify command line prefix for continuous workflow.
 
