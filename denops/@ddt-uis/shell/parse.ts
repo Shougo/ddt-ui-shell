@@ -358,14 +358,9 @@ function resolveVariableName(candidate: string, env: EnvMap): string {
     return candidate;
   }
 
-  // Scan backward so the first match is the longest defined prefix.
-  for (let i = candidate.length - 1; i > 0; i--) {
-    const suffixChar = candidate[i];
-    if (suffixChar < "a" || suffixChar > "z") {
-      continue;
-    }
-
-    const name = candidate.slice(0, i);
+  const suffixIndex = candidate.search(/[a-z]/);
+  if (suffixIndex > 0) {
+    const name = candidate.slice(0, suffixIndex);
     if (hasEnvValue(name, env)) {
       return name;
     }
