@@ -346,7 +346,8 @@ function resolveVariableName(candidate: string, env: EnvMap): string {
   }
 
   for (let i = candidate.length - 1; i > 0; i--) {
-    if (!/^[a-z]$/.test(candidate[i])) {
+    const suffixStart = candidate[i];
+    if (suffixStart < "a" || suffixStart > "z") {
       continue;
     }
 
