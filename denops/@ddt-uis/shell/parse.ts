@@ -3,6 +3,9 @@ import { expandGlob } from "@std/fs/expand-glob";
 import { assertEquals, assertThrows } from "@std/assert";
 
 type EnvMap = Record<string, string>;
+type QuoteKind = "none" | "single" | "double";
+type TokenSegment = { text: string; quote: QuoteKind };
+type ParsedToken = { text: string; segments: TokenSegment[] };
 
 export async function parseCommandLine(
   cwd: string,
@@ -16,12 +19,12 @@ export async function parseCommandLineWithEnv(
   cwd: string,
   input: string,
 ): Promise<{ env: EnvMap; args: string[] }> {
-  const tokens = splitArgs(input);
+  const tokens = parseTokens(input);
   const env: EnvMap = {};
 
   let i = 0;
   for (; i < tokens.length; i++) {
-    const tok = tokens[i];
+    const tok = tokens[i].text;
 
     const m = tok.match(/^\$?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/s);
     if (!m) break;
@@ -31,12 +34,12 @@ export async function parseCommandLineWithEnv(
 
     if (val === "" && i + 1 < tokens.length) {
       i++;
-      val = tokens[i];
+      val = tokens[i].text;
     } else {
       while (val.endsWith("\\") && i + 1 < tokens.length) {
         i++;
 
-        val += " " + tokens[i];
+        val += " " + tokens[i].text;
       }
     }
 
@@ -72,7 +75,7 @@ export async function parseCommandLineWithEnv(
   const remaining = tokens.slice(i);
   const resultArgs: string[] = [];
   for (const arg of remaining) {
-    const expanded = await expandArg(cwd, arg);
+    const expanded = await expandArg(cwd, arg, env);
     resultArgs.push(...expanded);
   }
 
@@ -95,11 +98,39 @@ type State =
   | "ESCAPED_SINGLE_QUOTE";
 
 export function splitArgs(input: string): string[] {
-  const result: string[] = [];
+  return parseTokens(input).map((token) => token.text);
+}
+
+function parseTokens(input: string): ParsedToken[] {
+  const result: ParsedToken[] = [];
+  let segments: TokenSegment[] = [];
   let buffer = "";
   let inToken = false;
   let state: State = "NORMAL";
   let quoteStart = -1;
+  let currentQuote: QuoteKind = "none";
+  let forceSegment = false;
+
+  const flushSegment = () => {
+    if (buffer !== "" || forceSegment) {
+      segments.push({ text: buffer, quote: currentQuote });
+      buffer = "";
+      forceSegment = false;
+    }
+  };
+
+  const pushToken = () => {
+    flushSegment();
+    result.push({
+      text: segments.map((segment) => segment.text).join(""),
+      segments: [...segments],
+    });
+    segments = [];
+    currentQuote = "none";
+    buffer = "";
+    forceSegment = false;
+    inToken = false;
+  };
 
   for (let i = 0; i < input.length; i++) {
     const c = input[i];
@@ -107,23 +138,32 @@ export function splitArgs(input: string): string[] {
     switch (state) {
       case "NORMAL":
         if (c === '"') {
+          flushSegment();
+          currentQuote = "double";
+          forceSegment = true;
           state = "IN_DOUBLE_QUOTE";
           quoteStart = i;
           inToken = true;
         } else if (c === "'") {
+          flushSegment();
+          currentQuote = "single";
+          forceSegment = true;
           state = "IN_SINGLE_QUOTE";
           quoteStart = i;
           inToken = true;
         } else if (c === "\\") {
+          currentQuote = "none";
           state = "ESCAPED_NORMAL";
           inToken = true;
         } else if (c === " " || c === "\t") {
           if (inToken) {
-            result.push(buffer);
-            buffer = "";
-            inToken = false;
+            pushToken();
           }
         } else {
+          if (currentQuote !== "none") {
+            flushSegment();
+            currentQuote = "none";
+          }
           buffer += c;
           inToken = true;
         }
@@ -131,6 +171,8 @@ export function splitArgs(input: string): string[] {
 
       case "IN_DOUBLE_QUOTE":
         if (c === '"') {
+          flushSegment();
+          currentQuote = "none";
           state = "NORMAL";
         } else if (c === "\\") {
           state = "ESCAPED_DOUBLE_QUOTE";
@@ -141,6 +183,8 @@ export function splitArgs(input: string): string[] {
 
       case "IN_SINGLE_QUOTE":
         if (c === "'") {
+          flushSegment();
+          currentQuote = "none";
           state = "NORMAL";
         } else if (c === "\\") {
           state = "ESCAPED_SINGLE_QUOTE";
@@ -209,7 +253,7 @@ export function splitArgs(input: string): string[] {
   }
 
   if (inToken) {
-    result.push(buffer);
+    pushToken();
   }
 
   return result;
@@ -217,11 +261,17 @@ export function splitArgs(input: string): string[] {
 
 async function expandArg(
   cwd: string,
-  arg: string,
+  arg: ParsedToken,
+  env: EnvMap,
 ): Promise<string[]> {
-  const expanded = arg.startsWith("~")
-    ? (Deno.env.get("HOME") ?? "~") + arg.slice(1)
-    : arg;
+  const expandedArg = arg.segments.map((segment) =>
+    segment.quote === "single"
+      ? segment.text
+      : expandVariables(segment.text, env)
+  ).join("");
+  const expanded = expandedArg.startsWith("~")
+    ? (Deno.env.get("HOME") ?? "~") + expandedArg.slice(1)
+    : expandedArg;
 
   if (
     expanded.includes("*") || expanded.includes("?") || expanded.includes("[")
@@ -235,6 +285,114 @@ async function expandArg(
   }
 
   return [expanded];
+}
+
+function expandVariables(text: string, env: EnvMap): string {
+  let result = "";
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c !== "$") {
+      result += c;
+      continue;
+    }
+
+    if (i + 1 >= text.length) {
+      result += c;
+      continue;
+    }
+
+    if (text[i + 1] === "{") {
+      const end = text.indexOf("}", i + 2);
+      if (end < 0) {
+        result += c;
+        continue;
+      }
+
+      const name = text.slice(i + 2, end);
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+        result += text.slice(i, end + 1);
+        i = end;
+        continue;
+      }
+
+      result += getEnvValue(name, env);
+      i = end;
+      continue;
+    }
+
+    if (!/^[A-Za-z_]$/.test(text[i + 1])) {
+      result += c;
+      continue;
+    }
+
+    let end = i + 2;
+    while (end < text.length && /^[A-Za-z0-9_]$/.test(text[end])) {
+      end++;
+    }
+
+    const candidate = text.slice(i + 1, end);
+    const name = resolveVariableName(candidate, env);
+    result += getEnvValue(name, env);
+    i += name.length;
+  }
+
+  return result;
+}
+
+function resolveVariableName(candidate: string, env: EnvMap): string {
+  if (hasEnvValue(candidate, env)) {
+    return candidate;
+  }
+
+  for (let i = candidate.length - 1; i > 0; i--) {
+    if (!/^[a-z]$/.test(candidate[i])) {
+      continue;
+    }
+
+    const name = candidate.slice(0, i);
+    if (hasEnvValue(name, env)) {
+      return name;
+    }
+  }
+
+  return candidate;
+}
+
+function hasEnvValue(name: string, env: EnvMap): boolean {
+  return Object.hasOwn(env, name) || Deno.env.get(name) !== undefined;
+}
+
+function getEnvValue(name: string, env: EnvMap): string {
+  return env[name] ?? Deno.env.get(name) ?? "";
+}
+
+async function withEnv<T>(
+  env: Record<string, string | undefined>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const previous = new Map<string, string | undefined>();
+
+  for (const [key, value] of Object.entries(env)) {
+    previous.set(key, Deno.env.get(key));
+    if (value === undefined) {
+      Deno.env.delete(key);
+    } else {
+      Deno.env.set(key, value);
+    }
+  }
+
+  try {
+    return await fn();
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) {
+        Deno.env.delete(key);
+      } else {
+        Deno.env.set(key, value);
+      }
+    }
+  }
 }
 
 Deno.test("splitArgs should split a simple command", () => {
@@ -308,6 +466,74 @@ Deno.test("glob expansion in args (integration)", async () => {
 
     const gotFiles = res.args.slice(1).slice().sort();
     assertEquals(gotFiles, ["a.txt", "b.txt"]);
+  } finally {
+    await Deno.remove(tmp, { recursive: true });
+  }
+});
+
+Deno.test("environment variable expansion in args", async () => {
+  await withEnv({ DDT_UI_SHELL_TEST_HOGE: "world" }, async () => {
+    const res = await parseCommandLineWithEnv(
+      Deno.cwd(),
+      "echo $DDT_UI_SHELL_TEST_HOGE",
+    );
+    assertEquals(res.env, {});
+    assertEquals(res.args, ["echo", "world"]);
+  });
+});
+
+Deno.test("braced environment variable expansion in args", async () => {
+  await withEnv({ DDT_UI_SHELL_TEST_HOGE: "world" }, async () => {
+    const res = await parseCommandLineWithEnv(
+      Deno.cwd(),
+      'echo "${DDT_UI_SHELL_TEST_HOGE}"',
+    );
+    assertEquals(res.env, {});
+    assertEquals(res.args, ["echo", "world"]);
+  });
+});
+
+Deno.test("single-quoted args suppress environment variable expansion", async () => {
+  await withEnv({ DDT_UI_SHELL_TEST_HOGE: "world" }, async () => {
+    const res = await parseCommandLineWithEnv(
+      Deno.cwd(),
+      "echo '$DDT_UI_SHELL_TEST_HOGE'",
+    );
+    assertEquals(res.env, {});
+    assertEquals(res.args, ["echo", "$DDT_UI_SHELL_TEST_HOGE"]);
+  });
+});
+
+Deno.test("environment variable expansion works within words", async () => {
+  await withEnv({ HOGE: undefined, HOGEbar: undefined }, async () => {
+    const res = await parseCommandLineWithEnv(
+      Deno.cwd(),
+      "HOGE=world echo foo$HOGEbar",
+    );
+    assertEquals(res.env, { HOGE: "world" });
+    assertEquals(res.args, ["echo", "fooworldbar"]);
+  });
+});
+
+Deno.test("leading env assignments are visible to command arg expansion", async () => {
+  await withEnv({ HOGE: "process" }, async () => {
+    const res = await parseCommandLineWithEnv(
+      Deno.cwd(),
+      "HOGE=world echo $HOGE",
+    );
+    assertEquals(res.env, { HOGE: "world" });
+    assertEquals(res.args, ["echo", "world"]);
+  });
+});
+
+Deno.test("tilde expansion in args (integration)", async () => {
+  const tmp = await Deno.makeTempDir();
+  try {
+    await withEnv({ HOME: tmp }, async () => {
+      const res = await parseCommandLineWithEnv(Deno.cwd(), "echo ~/file.txt");
+      assertEquals(res.env, {});
+      assertEquals(res.args, ["echo", `${tmp}/file.txt`]);
+    });
   } finally {
     await Deno.remove(tmp, { recursive: true });
   }
