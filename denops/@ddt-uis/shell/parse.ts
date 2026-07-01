@@ -340,6 +340,9 @@ function expandVariables(text: string, env: EnvMap): string {
   return result;
 }
 
+// Prefer an exact name, but allow "$HOGEbar" to resolve as "$HOGE" + "bar"
+// when only the shorter name exists and the unresolved suffix starts with
+// lowercase text.
 function resolveVariableName(candidate: string, env: EnvMap): string {
   if (hasEnvValue(candidate, env)) {
     return candidate;
@@ -506,12 +509,12 @@ Deno.test("single-quoted args suppress environment variable expansion", async ()
 });
 
 Deno.test("environment variable expansion works within words", async () => {
-  await withEnv({ HOGE: undefined, HOGEbar: undefined }, async () => {
+  await withEnv({ DDT_UI_SHELL_TEST_HOGE: "world" }, async () => {
     const res = await parseCommandLineWithEnv(
       Deno.cwd(),
-      "HOGE=world echo foo$HOGEbar",
+      "echo foo$DDT_UI_SHELL_TEST_HOGEbar",
     );
-    assertEquals(res.env, { HOGE: "world" });
+    assertEquals(res.env, {});
     assertEquals(res.args, ["echo", "fooworldbar"]);
   });
 });
