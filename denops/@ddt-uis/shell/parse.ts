@@ -6,6 +6,9 @@ type EnvMap = Record<string, string>;
 type QuoteKind = "none" | "single" | "double";
 type TokenSegment = { text: string; quote: QuoteKind };
 type ParsedToken = { text: string; segments: TokenSegment[] };
+const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const VARIABLE_START_CHAR = /^[A-Za-z_]$/;
+const VARIABLE_CHAR = /^[A-Za-z0-9_]$/;
 
 export async function parseCommandLine(
   cwd: string,
@@ -314,7 +317,7 @@ function expandVariables(text: string, env: EnvMap): string {
       }
 
       const name = text.slice(i + 2, end);
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+      if (!VARIABLE_NAME.test(name)) {
         result += text.slice(i, end + 1);
         i = end;
         continue;
@@ -325,13 +328,13 @@ function expandVariables(text: string, env: EnvMap): string {
       continue;
     }
 
-    if (!/^[A-Za-z_]$/.test(text[i + 1])) {
+    if (!VARIABLE_START_CHAR.test(text[i + 1])) {
       result += c;
       continue;
     }
 
     let end = i + 2;
-    while (end < text.length && /^[A-Za-z0-9_]$/.test(text[end])) {
+    while (end < text.length && VARIABLE_CHAR.test(text[end])) {
       end++;
     }
 
@@ -345,15 +348,17 @@ function expandVariables(text: string, env: EnvMap): string {
 }
 
 /**
- * Prefers an exact variable name, but allows "$HOGEbar" to resolve as
- * "$HOGE" + "bar" when only the shorter name exists and the unresolved suffix
- * starts with lowercase text.
+ * Prefers an exact variable name, but can fall back from "$HOGEbar" to the
+ * shorter name "HOGE" when the unresolved suffix starts with lowercase text.
+ * The caller keeps scanning after the returned name, so the "bar" suffix
+ * remains as literal text in the final expanded argument.
  */
 function resolveVariableName(candidate: string, env: EnvMap): string {
   if (hasEnvValue(candidate, env)) {
     return candidate;
   }
 
+  // Scan backward so the first match is the longest defined prefix.
   for (let i = candidate.length - 1; i > 0; i--) {
     const suffixChar = candidate[i];
     if (suffixChar < "a" || suffixChar > "z") {
