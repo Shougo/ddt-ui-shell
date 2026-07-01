@@ -287,6 +287,10 @@ async function expandArg(
   return [expanded];
 }
 
+/**
+ * Expands $VAR and ${VAR} references using parsed leading assignments first
+ * and then the process environment. Invalid variable syntax is left unchanged.
+ */
 function expandVariables(text: string, env: EnvMap): string {
   let result = "";
 
@@ -340,17 +344,19 @@ function expandVariables(text: string, env: EnvMap): string {
   return result;
 }
 
-// Prefer an exact name, but allow "$HOGEbar" to resolve as "$HOGE" + "bar"
-// when only the shorter name exists and the unresolved suffix starts with
-// lowercase text.
+/**
+ * Prefers an exact variable name, but allows "$HOGEbar" to resolve as
+ * "$HOGE" + "bar" when only the shorter name exists and the unresolved suffix
+ * starts with lowercase text.
+ */
 function resolveVariableName(candidate: string, env: EnvMap): string {
   if (hasEnvValue(candidate, env)) {
     return candidate;
   }
 
   for (let i = candidate.length - 1; i > 0; i--) {
-    const suffixStart = candidate[i];
-    if (suffixStart < "a" || suffixStart > "z") {
+    const suffixChar = candidate[i];
+    if (suffixChar < "a" || suffixChar > "z") {
       continue;
     }
 
