@@ -879,8 +879,8 @@ export class Ui extends BaseUi<Params> {
     const defaults = this.params();
 
     context = {
-      uiParams,
       ...context,
+      uiParams,
     };
 
     const params = Object.assign(uiParams);
@@ -963,7 +963,7 @@ export class Ui extends BaseUi<Params> {
         // TODO: More improved parse.
         [cmd, ...cmdArgs] = await parseCommandLine(
           this.#cwd,
-          commandLine.replace(cmd, uiParams.aliases[cmd]),
+          `${uiParams.aliases[cmd]} ${cmdArgs.join(" ")}`.trim(),
         );
       }
 

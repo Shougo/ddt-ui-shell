@@ -1,4 +1,4 @@
-let s:namespace = has('nvim') ? nvim_create_namespace('ddu-ui-ff') : 0
+let s:namespace = has('nvim') ? nvim_create_namespace('ddt-ui-shell') : 0
 
 function ddt#ui#shell#_split(params) abort
   if a:params.split ==# ''
@@ -42,7 +42,7 @@ function ddt#ui#shell#_check_prompt() abort
   endif
 
   if '$'->line() ==# '.'->line()
-    if !'b:ddt_ui_shell_prompt'->exists()
+    if !'b:ddt_ui_shell_prompt'->exists() || b:ddt_ui_shell_prompt ==# ''
       return
     endif
 
