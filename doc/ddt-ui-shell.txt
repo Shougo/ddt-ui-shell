@@ -45,7 +45,10 @@ cd
 		params:
 			{directory}: New current directory.
 
-		Change current directory to {directory}.
+		Change the shell UI directory and Vim/Neovim's current directory
+		to {directory}.
+
+		The |DirChanged| autocmd is triggered.
 
                                              *ddt-ui-shell-action-executeLine*
 executeLine
@@ -162,8 +165,8 @@ flushIntervalMs	number
 
                                     *ddt-ui-shell-param-noSaveHistoryCommands*
 noSaveHistoryCommands	string[]
-		It prevents the commands listed from being saved in the
-		history.
+		The entries are compared with the parsed command name, not the
+		complete command line.
 
 		Default: []
 
@@ -190,20 +193,24 @@ promptHighlight	string
                                             *ddt-ui-shell-param-promptPattern*
 promptPattern	string
 		Sets the pattern which matches the shell prompt.
+		The pattern is matched at the beginning of a line to identify
+		the shell prompt.
 		NOTE: The right prompt is not supported.
 		NOTE: It must be Vim script regex.
 
 		Default: "% "
 
                                           *ddt-ui-shell-param-shellHistoryMax*
-shellHistoryMax
-		Specify the history max of the shell.
+shellHistoryMax	number
+		Sets the maximum number of entries kept in the history file.
 
-		Default: 500
+		The history file is trimmed after a command is saved.
 
                                          *ddt-ui-shell-param-shellHistoryPath*
-shellHistoryPath
-		Specify the history path of the shell.
+shellHistoryPath string
+		Sets the history file path.
+
+		If it is empty, command history is not saved or loaded.
 
 		Default: ""
 
@@ -244,6 +251,9 @@ userPromptHighlight	string
                                         *ddt-ui-shell-param-userPromptPattern*
 userPromptPattern	string
 		Sets the pattern which matches the user prompt.
+		The pattern is matched at the beginning of a line.
+		It is used to find and replace previously displayed user
+		prompt lines.
 		NOTE: It must be Vim script regex.
 
 		Default: "| .*"
@@ -318,6 +328,8 @@ with {command-line}
 ==============================================================================
 EXAMPLES                                               *ddt-ui-shell-examples*
 >vim
+	" The Deno process must have the permissions required by the PTY,
+	" shell execution, and history file access. The example uses "-A".
 	let g:denops#server#deno_args = [
 	    \   '-q',
 	    \   '-A',

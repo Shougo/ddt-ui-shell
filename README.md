@@ -23,6 +23,8 @@ It requires "--unstable-ffi" for |g:denops#server#deno_args|.
 ## Configuration
 
 ```vim
+" The Deno process must have the permissions required by the PTY,
+" shell execution, and history file access. The example uses "-A".
 let g:denops#server#deno_args = [
     \   '-q',
     \   '-A',
