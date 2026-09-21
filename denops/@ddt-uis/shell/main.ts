@@ -83,7 +83,6 @@ export type Params = {
   shellHistoryPath: string;
   split: string;
   startInsert: boolean;
-  toggle: boolean;
   userPrompt: string;
   userPromptHighlight: string;
   userPromptPattern: string;
@@ -500,7 +499,6 @@ export class Ui extends BaseUi<Params> {
       shellHistoryPath: "",
       split: "",
       startInsert: false,
-      toggle: false,
       userPrompt: "",
       userPromptHighlight: "Special",
       userPromptPattern: "| .*",

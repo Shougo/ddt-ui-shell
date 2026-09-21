@@ -108,7 +108,7 @@ aliases		Record<string, string>
 
                                       *ddt-ui-shell-param-ansiColorHighlights*
 ansiColorHighlights ANSIColorHighlights
-		Sets the highight group name of ANSI colors.
+		Sets the highlight group name of ANSI colors.
 
 		bgs:	string[]
 			Background colors.
@@ -124,7 +124,7 @@ ansiColorHighlights ANSIColorHighlights
 		italic:	string
 			Italic color.
 
-		underline string
+		underline: string
 			Underlined color.
 
 		Default: {}
@@ -134,6 +134,15 @@ cwd		string
 		Current directory.
 
 		Default: Use |getcwd()| value
+
+                                          *ddt-ui-shell-param-floatingBorder*
+floatingBorder	string
+		Sets the border style of the floating window.
+
+		This parameter is used only when |ddt-ui-shell-param-split|
+		is "floating" and Neovim is used.
+
+		Default: ""
 
                                           *ddt-ui-shell-param-flushIntervalMs*
 flushIntervalMs	number
@@ -209,7 +218,7 @@ split
 startInsert	boolean
 		Start the insert mode.
 
-		Default: v:true
+		Default: v:false
 
                                                *ddt-ui-shell-param-userPrompt*
 userPrompt	string
