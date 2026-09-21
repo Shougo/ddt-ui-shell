@@ -26,9 +26,9 @@ This UI is shell UI.
 ==============================================================================
 INSTALL                                                 *ddt-ui-shell-install*
 
-Please install both "ddu.vim" and "denops.vim".
+Please install both "ddt.vim" and "denops.vim".
 
-https://github.com/Shougo/ddu.vim
+https://github.com/Shougo/ddt.vim
 https://github.com/vim-denops/denops.vim
 
 It requires "--unstable-ffi" for |g:denops#server#deno_args|.
@@ -104,7 +104,7 @@ PARAMS                                                   *ddt-ui-shell-params*
 aliases		Record<string, string>
 		Define command aliases.
 
-		Default: []
+		Default: {}
 
                                       *ddt-ui-shell-param-ansiColorHighlights*
 ansiColorHighlights ANSIColorHighlights
