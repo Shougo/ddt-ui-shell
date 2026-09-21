@@ -100,7 +100,7 @@ type SendParams = {
   str: string;
 };
 
-type SetPrompt = {
+type SetCommandLine = {
   str: string;
 };
 
@@ -267,7 +267,7 @@ export class Ui extends BaseUi<Params> {
           commandLine.length === 0
         ) {
           // History execution.
-          await this.#newPrompt(args.denops, args.uiParams, commandLine);
+          await this.#newCommandLine(args.denops, args.uiParams, commandLine);
         }
 
         await this.#execute(
@@ -291,7 +291,7 @@ export class Ui extends BaseUi<Params> {
         const params = args.actionParams as SendParams;
 
         if (!this.#pty) {
-          await this.#newPrompt(args.denops, args.uiParams, params.str);
+          await this.#newCommandLine(args.denops, args.uiParams, params.str);
         } else {
           this.#pty.write(params.str);
         }
@@ -339,7 +339,7 @@ export class Ui extends BaseUi<Params> {
           this.#prompt,
         );
 
-        await this.#newPrompt(args.denops, args.uiParams, commandLine);
+        await this.#newCommandLine(args.denops, args.uiParams, commandLine);
       },
     },
     previousPrompt: {
@@ -393,7 +393,7 @@ export class Ui extends BaseUi<Params> {
         bufferStack.push(commandLine);
         this.#bufferStack = [];
 
-        await this.#newPrompt(args.denops, args.uiParams, "");
+        await this.#newCommandLine(args.denops, args.uiParams, "");
 
         this.#bufferStack = bufferStack;
       },
@@ -412,7 +412,7 @@ export class Ui extends BaseUi<Params> {
         const lastLine = await fn.getbufoneline(args.denops, this.#bufNr, "$");
         if (lastLine === args.uiParams.prompt + " ") {
           // Redraw the prompt
-          await this.#newPrompt(args.denops, args.uiParams);
+          await this.#newCommandLine(args.denops, args.uiParams);
         }
       },
     },
@@ -428,7 +428,7 @@ export class Ui extends BaseUi<Params> {
         const params = args.actionParams as SendParams;
 
         if (!this.#pty) {
-          await this.#newPrompt(args.denops, args.uiParams, params.str);
+          await this.#newCommandLine(args.denops, args.uiParams, params.str);
         }
 
         await this.#execute(
@@ -440,8 +440,8 @@ export class Ui extends BaseUi<Params> {
         );
       },
     },
-    setPrompt: {
-      description: "Set the prompt string",
+    setCommandLine: {
+      description: "Set the command line string",
       callback: async (args: {
         denops: Denops;
         options: DdtOptions;
@@ -449,9 +449,9 @@ export class Ui extends BaseUi<Params> {
         uiParams: Params;
         actionParams: BaseParams;
       }) => {
-        const params = args.actionParams as SetPrompt;
+        const params = args.actionParams as SetCommandLine;
 
-        await this.#newPrompt(args.denops, args.uiParams, params.str);
+        await this.#newCommandLine(args.denops, args.uiParams, params.str);
       },
     },
     terminate: {
@@ -469,7 +469,7 @@ export class Ui extends BaseUi<Params> {
           this.#pty.close();
           this.#pty = null;
         } else {
-          await this.#newPrompt(args.denops, args.uiParams);
+          await this.#newCommandLine(args.denops, args.uiParams);
         }
       },
     },
@@ -589,7 +589,7 @@ export class Ui extends BaseUi<Params> {
         }
 
         // Print prompt before edit.
-        await this.#newPrompt(args.denops, args.uiParams);
+        await this.#newCommandLine(args.denops, args.uiParams);
 
         const abspath = isAbsolute(args.cmdArgs[0])
           ? args.cmdArgs[0]
@@ -636,7 +636,7 @@ export class Ui extends BaseUi<Params> {
       await this.#cd(denops, params, newCwd);
     } else if (lastLine === params.prompt + " ") {
       // Redraw the prompt
-      await this.#newPrompt(denops, params);
+      await this.#newCommandLine(denops, params);
     }
   }
 
@@ -688,10 +688,14 @@ export class Ui extends BaseUi<Params> {
       },
     );
 
-    await this.#newPrompt(denops, params);
+    await this.#newCommandLine(denops, params);
   }
 
-  async #newPrompt(denops: Denops, params: Params, commandLine: string = "") {
+  async #newCommandLine(
+    denops: Denops,
+    params: Params,
+    commandLine: string = "",
+  ) {
     if (this.#pty) {
       this.#pty.close();
       this.#pty = null;
@@ -928,13 +932,13 @@ export class Ui extends BaseUi<Params> {
     await fn.chdir(denops, this.#cwd);
     await denops.cmd("doautocmd DirChanged");
 
-    await this.#newPrompt(denops, params);
+    await this.#newCommandLine(denops, params);
   }
 
   async #newCdPrompt(denops: Denops, params: Params, directory: string) {
     const quote = Deno.build.os === "windows" ? '"' : "'";
     const commandLine = `cd ${quote}${directory}${quote}`;
-    await this.#newPrompt(denops, params, commandLine);
+    await this.#newCommandLine(denops, params, commandLine);
 
     await appendHistory(denops, params, commandLine);
   }
@@ -981,7 +985,7 @@ export class Ui extends BaseUi<Params> {
 
         const skipPrompt = result.skipPrompt ?? false;
         if (!skipPrompt) {
-          await this.#newPrompt(denops, uiParams);
+          await this.#newCommandLine(denops, uiParams);
         }
 
         return;
@@ -1005,7 +1009,7 @@ export class Ui extends BaseUi<Params> {
 
       if (!await fn.executable(denops, cmd)) {
         printError(denops, `${cmd} is not executable file.`);
-        await this.#newPrompt(denops, uiParams);
+        await this.#newCommandLine(denops, uiParams);
         return;
       }
 
@@ -1031,7 +1035,7 @@ export class Ui extends BaseUi<Params> {
         this.#startTime = null;
       }
 
-      await this.#newPrompt(denops, uiParams);
+      await this.#newCommandLine(denops, uiParams);
     } else {
       this.#pty.write(`${commandLine}\n`);
     }

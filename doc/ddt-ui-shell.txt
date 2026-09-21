@@ -56,11 +56,10 @@ insert
 		params:
 			{str}: Target string.
 
-		Insert {str} to the process.
+		Insert {str} into the running process.
 
-                                               *ddt-ui-shell-action-terminate*
-terminate
-		Terminate the current command.
+		If no process is running, set {str} as the current command
+		line.
 
                                               *ddt-ui-shell-action-nextPrompt*
 nextPrompt
@@ -88,14 +87,21 @@ send
 		params:
 			{str}: Target string.
 
-		Send {str} to the process and execute.
+		Send {str} to the process and execute it.
 
-                                               *ddt-ui-shell-action-setPrompt*
-setPrompt
+		If no process is running, start execution from the current
+		prompt.
+
+                                          *ddt-ui-shell-action-setCommandLine*
+setCommandLine
 		params:
 			{str}: Target string.
 
-		Send {str} to the prompt.
+		Set the current command line to {str}.
+
+                                               *ddt-ui-shell-action-terminate*
+terminate
+		Terminate the current command.
 
 ------------------------------------------------------------------------------
 PARAMS                                                   *ddt-ui-shell-params*
@@ -334,6 +340,9 @@ FREQUENTLY ASKED QUESTIONS (FAQ)                            *ddt-ui-shell-faq*
 
 ==============================================================================
 COMPATIBILITY                                     *ddt-ui-shell-compatibility*
+
+2026.09.21
+* Rename "setPrompt" to "setCommandLine".
 
 2025.05.14
 * Rename "ANSIColorHighlights" param to "ansiColorHighlights".
