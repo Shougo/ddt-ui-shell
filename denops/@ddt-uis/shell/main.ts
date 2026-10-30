@@ -490,7 +490,7 @@ export class Ui extends BaseUi<Params> {
       flushIntervalMs: 100,
       noSaveHistoryCommands: [],
       passwordPattern: "(Enter |Repeat |[Oo]ld |[Nn]ew |login " +
-        "|Kerberos |EncFS |CVS |UNIX | SMB |LDAP |\\[sudo\\] )" +
+        "|Kerberos |EncFS |CVS |UNIX | SMB |LDAP |\\[sudo\( \\w*\)?\\] )" +
         "([Pp]assword|[Pp]assphrase)",
       prompt: "%",
       promptHighlight: "Identifier",
